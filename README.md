@@ -5,7 +5,7 @@ Aplicação web do Google Apps Script para registrar entregas individuais e cole
 ## Recursos
 
 - Destinatário colaborador ou setor para uso coletivo.
-- Vínculo próprio ou terceirizado; matrícula própria busca nome, setor e função na matriz.
+- Vínculo próprio ou terceirizado; a matrícula própria é informada manualmente e não é consultada na planilha.
 - Setores e funções carregados da aba `MATRIZ POR SETOR`, com opção para setores assistenciais pontuais.
 - EPIs individuais limitados aos itens previstos para setor e função. Para setor/uso coletivo, a lista inclui avental plumbífero, protetor de tireóide, cinta ergonômica e protetor auditivo de espuma.
 - Entrega inicial, substituição, empréstimo com previsão de devolução e registro de devolução por item emprestado.
