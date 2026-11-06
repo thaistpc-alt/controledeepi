@@ -161,12 +161,12 @@ function submitMovement(payload) {
     if (queue) {
       const almoxRows = payload.items.map(line => {
         const code = resolveAlmoxCode_(line, catalog);
-        return [timestamp, sector, line.kind, line.item, line.size || 'NA',
-          Number(line.quantity), code, false];
+        return [timestamp, sector, line.item, line.size || 'NA',
+          Number(line.quantity), code, false, ''];
       });
-      const firstQueueRow = queue.getLastRow() + 1;
+      const firstQueueRow = nextAlmoxQueueRow_(queue);
       queue.getRange(firstQueueRow, 1, almoxRows.length, 8).setValues(almoxRows);
-      queue.getRange(firstQueueRow, 8, almoxRows.length, 1).insertCheckboxes();
+      queue.getRange(firstQueueRow, 7, almoxRows.length, 1).insertCheckboxes();
     }
     return {ok: true, id, message: payload.operation === 'EMPRÉSTIMO'
       ? 'Empréstimo registrado. Guarde o identificador para registrar a devolução.'
@@ -276,16 +276,26 @@ function getAlmoxCatalog_() {
     .map(r => ({code: String(r[0]).trim(), description: String(r[1]).trim()}));
 }
 
+function nextAlmoxQueueRow_(sheet) {
+  const rowCount = sheet.getMaxRows();
+  if (rowCount < 2) return 2;
+  const dates = sheet.getRange(2, 1, rowCount - 1, 1).getValues();
+  for (let i = dates.length - 1; i >= 0; i--) {
+    if (dates[i][0] !== '' && dates[i][0] !== null) return i + 3;
+  }
+  return 2;
+}
+
 function ensureAlmoxQueueSheet_(ss) {
   let sheet = ss.getSheetByName(APP_CONFIG.tabs.almoxQueue);
   if (!sheet) sheet = ss.insertSheet(APP_CONFIG.tabs.almoxQueue);
-  const headers = ['DATA/HORA', 'SETOR', 'TIPO', 'ITEM', 'TAMANHO', 'QUANTIDADE', 'CÓDIGO ALMOX', 'LANÇADO NO ALMOX?'];
+  const headers = ['DATA/HORA', 'SETOR', 'ITEM', 'TAMANHO', 'QUANTIDADE', 'CÓDIGO ALMOX', 'LANÇADO NO ALMOX?', 'OBSERVAÇÃO'];
   if (sheet.getLastRow() === 0) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.setFrozenRows(1);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#d9ead3');
     sheet.setColumnWidths(1, headers.length, 150);
-    sheet.setColumnWidth(4, 320);
+    sheet.setColumnWidth(3, 320);
   }
   return sheet;
 }
@@ -314,7 +324,7 @@ function showAllAlmoxRows_() {
 function handleAlmoxEdit_(e) {
   if (!e || !e.range) return;
   const sheet = e.range.getSheet();
-  if (sheet.getName() !== APP_CONFIG.tabs.almoxQueue || e.range.getColumn() !== 8 || e.range.getRow() < 2) return;
+  if (sheet.getName() !== APP_CONFIG.tabs.almoxQueue || e.range.getColumn() !== 7 || e.range.getRow() < 2) return;
   if (String(e.value).toUpperCase() === 'TRUE') sheet.hideRows(e.range.getRow());
   else sheet.showRows(e.range.getRow());
 }
