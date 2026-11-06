@@ -14,8 +14,9 @@
     label{font-size:13px;font-weight:650;color:#34435a}input,select,textarea{font:inherit;font-size:14px;border:1px solid #cdd7e5;border-radius:9px;padding:11px 12px;background:#fff;color:#18263d;min-width:0;width:100%}
     input:focus,select:focus,textarea:focus{outline:3px solid #dce8ff;border-color:#6d94e8}textarea{min-height:82px;resize:vertical}.hint{font-size:12px;color:var(--muted);line-height:1.45}
     .hidden{display:none!important}.radio-row{display:flex;gap:10px;flex-wrap:wrap}.choice{border:1px solid var(--line);padding:11px 13px;border-radius:10px;display:flex;align-items:center;gap:8px;cursor:pointer}.choice input{width:auto;margin:0;accent-color:var(--blue)}
-    .item-list{display:grid;gap:11px}.item-card{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fbfcff}.item-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-weight:700;font-size:14px}.item-grid{display:grid;grid-template-columns:1.1fr 2fr .75fr 1fr 1fr;gap:10px}.item-grid .field label{font-size:12px}
+    .item-list{display:grid;gap:11px}.item-card{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fbfcff}.item-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-weight:700;font-size:14px}.item-grid{display:grid;grid-template-columns:minmax(105px,.9fr) minmax(390px,4fr) minmax(90px,.8fr) minmax(105px,1fr) minmax(100px,.95fr);gap:10px}.item-grid .field label{font-size:12px}.selected-item-name{display:block;margin-top:4px;white-space:normal;overflow-wrap:anywhere;color:#34435a;font-size:12px;line-height:1.4}.selected-item-name.hidden{display:none!important}
     button{border:0;border-radius:10px;padding:12px 16px;font-weight:700;font-size:14px;cursor:pointer}.primary{background:var(--blue);color:#fff}.secondary{background:#edf3ff;color:#204caa}.danger{background:#fff0f0;color:#ad3434;padding:7px 10px;font-size:12px}.actions{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:15px}.submit-row{display:flex;justify-content:flex-end;margin-top:20px}.status{margin-top:14px;padding:12px 14px;border-radius:10px;display:none;line-height:1.45}.status.ok{display:block;background:#eaf8ef;color:#17643a;border:1px solid #b8e4c7}.status.err{display:block;background:#fff0ef;color:#a12820;border:1px solid #f1c2be}.busy{opacity:.65;pointer-events:none}.footer{font-size:12px;color:#718096;text-align:center;margin-top:17px}
+    @media(min-width:721px) and (max-width:900px){.item-grid{grid-template-columns:minmax(90px,.8fr) minmax(260px,2fr) minmax(90px,.8fr) minmax(90px,.8fr) minmax(90px,.8fr)}}
     @media(max-width:720px){body{padding:12px 8px 28px}.hero{padding:20px}.hero h1{font-size:21px;line-height:1.25}.card{padding:15px}.grid{grid-template-columns:1fr;gap:12px}.field.full{grid-column:auto}.item-grid{grid-template-columns:1fr}.item-grid .item-field{grid-column:auto}.item-head{margin-bottom:9px}.actions{align-items:stretch;flex-direction:column}.actions button{width:100%}button,select,input,textarea{min-height:44px}.item-card{padding:12px}}
   </style>
 </head>
@@ -141,7 +142,7 @@
     card.innerHTML=`<div class="item-head"><span>Item ${id}</span><button type="button" class="danger" aria-label="Remover item">Remover</button></div>
       <div class="item-grid">
         <div class="field"><label>Tipo *</label><select class="kind"><option value="EPI">EPI</option><option value="MATERIAL">Outros materiais</option></select></div>
-        <div class="field item-field"><label>Descrição *</label><select class="item"><option value="">Selecione</option></select><input class="item-custom hidden" placeholder="Descreva o outro material" aria-label="Descreva o outro material"></div>
+        <div class="field item-field"><label>Descrição *</label><select class="item"><option value="">Selecione</option></select><span class="selected-item-name hint hidden" aria-live="polite"></span><input class="item-custom hidden" placeholder="Descreva o outro material" aria-label="Descreva o outro material"></div>
         <div class="field size-field hidden"><label>Tamanho do calçado *</label><select class="size"></select></div>
         <div class="field ca-field"><label>CA</label><input class="ca" placeholder="Número do CA"></div>
         <div class="field"><label>Quantidade *</label><input class="quantity" type="number" min="1" step="1" value="1"></div>
@@ -167,11 +168,11 @@
       const sector=getSector();
       if(sector){
         const recipient=$('recipientType').value;
-        google.script.run.withSuccessHandler(list=>{ fillItemSelect(select,list,previous); updateSizeField(card); })
+        google.script.run.withSuccessHandler(list=>{ fillItemSelect(select,list,previous); updateSizeField(card); updateItemPreview(card); })
           .withFailureHandler(err=>showMessage(err.message||String(err),false))
           .getAllowedPpe(sector,'',recipient);
       } else {
-        fillItemSelect(select,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],previous);
+        fillItemSelect(select,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],previous); updateItemPreview(card);
       }
       size.disabled=false;
       setOptions(size,bootstrap.sizes,'Selecione o número');
@@ -185,6 +186,16 @@
       size.value='NA'; size.disabled=true; sizeField.classList.add('hidden');
     }
     updateSizeField(card);
+    updateItemPreview(card);
+  }
+  function updateItemPreview(card){
+    const select=card.querySelector('.item');
+    const preview=card.querySelector('.selected-item-name');
+    const option=select.options[select.selectedIndex];
+    const label=select.value && option ? option.textContent : '';
+    preview.textContent=label;
+    preview.classList.toggle('hidden',!label);
+    select.title=label;
   }
   function updateSizeField(card){
     const kind=card.querySelector('.kind').value;
