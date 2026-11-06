@@ -148,21 +148,32 @@
   function renumberItems(){ Array.from($('items').children).forEach((el,i)=>el.querySelector('.item-head span').textContent='Item '+(i+1)); }
   function refreshItemOptions(){ Array.from($('items').children).forEach(refreshOneItem); }
   function refreshOneItem(card){
-    const kind=card.querySelector('.kind').value, current=card.querySelector('.item'), size=card.querySelector('.size');
-    const old=current.value;
-    let select=current;
-    if(kind==='EPI' && current.tagName!=='SELECT'){ const replacement=document.createElement('select'); replacement.className='item'; current.replaceWith(replacement); select=replacement; }
-    if(kind==='MATERIAL' && current.tagName!=='INPUT'){ const input=document.createElement('input'); input.className='item'; input.placeholder='Ex.: luminária, fita antiderrapante, cone, placa'; input.value=old; current.replaceWith(input); }
+    const kind=card.querySelector('.kind').value;
+    let itemField=card.querySelector('.item');
+    const size=card.querySelector('.size');
+    const old=itemField.value;
     if(kind==='EPI'){
+      if(itemField.tagName!=='SELECT'){
+        const select=document.createElement('select'); select.className='item'; itemField.replaceWith(select); itemField=select;
+      }
       const sector=getSector();
       if($('recipientType').value==='SETOR'){
-        fillItemSelect(select,bootstrap.collectivePpe,old);
+        fillItemSelect(itemField,bootstrap.collectivePpe,old);
       } else if(sector){
-        google.script.run.withSuccessHandler(list=>{ fillItemSelect(select,list,old); }).withFailureHandler(err=>showMessage(err.message||String(err),false)).getAllowedPpe(sector,'','COLABORADOR');
-      } else { fillItemSelect(select,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],old); }
-    } else {\n      const input=document.createElement('input'); input.className='item'; input.placeholder='Ex.: luminária, fita antiderrapante, cone, placa'; input.value=old;\n      select.replaceWith(input); size.disabled=true; size.value='NA';\n    }\n    if(kind==='EPI' && !select.isConnected){ const replacement=document.createElement('select'); replacement.className='item'; replacement.innerHTML='<option value="">Selecione</option>'; card.querySelector('.item-field').appendChild(replacement); }
-    if(kind==='EPI'){
+        google.script.run.withSuccessHandler(list=>{ fillItemSelect(itemField,list,old); })
+          .withFailureHandler(err=>showMessage(err.message||String(err),false))
+          .getAllowedPpe(sector,'','COLABORADOR');
+      } else {
+        fillItemSelect(itemField,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],old);
+      }
       setOptions(size,bootstrap.sizes,'Selecione'); size.value='NA'; size.disabled=false;
+    } else {
+      if(itemField.tagName!=='INPUT'){
+        const input=document.createElement('input'); input.className='item';
+        input.placeholder='Ex.: luminária, fita antiderrapante, cone, placa'; input.value=old;
+        itemField.replaceWith(input);
+      }
+      size.disabled=true; size.value='NA';
     }
   }
   function fillItemSelect(select,items,old){
