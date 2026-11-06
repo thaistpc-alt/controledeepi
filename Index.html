@@ -34,19 +34,21 @@
       <div class="field" id="recipient-type-wrap"><label for="recipientType">Destinatário *</label><select id="recipientType"><option value="COLABORADOR">Colaborador</option><option value="SETOR">Setor / uso coletivo</option></select></div>
       <div class="field" id="link-wrap"><label for="link">Vínculo *</label><select id="link"><option value="PRÓPRIO">Próprio</option><option value="TERCEIRIZADO">Terceirizado</option></select></div>
       <div class="field" id="matricula-wrap"><label for="matricula">Matrícula</label><input id="matricula" inputmode="numeric" maxlength="4" placeholder="4 dígitos"><span class="hint">Ao localizar a matrícula, o nome, setor e função serão preenchidos.</span></div>
-      <div class="field hidden" id="company-wrap"><label for="company">Empresa terceirizada *</label><input id="company" placeholder="Nome da empresa"></div>
+      <div class="field hidden" id="company-wrap"><label for="company">Empresa terceirizada *</label><select id="company"><option value="">Selecione</option><option>COOPERATIVA</option><option>SERVIÇOS GERAIS</option><option>SEGURANÇA</option><option>OBRAS</option><option>TRATAMENTO DE ESGOTO E ÁGUA</option><option>AR-CONDICIONADO</option><option>DEDETIZAÇÃO</option><option>ALIMENTAÇÃO</option><option>SUBESTAÇÃO</option><option>IMAGEM</option><option>HEMODIÁLISE</option><option value="OUTRA">OUTRA</option></select></div>
+      <div class="field hidden" id="other-company-wrap"><label for="otherCompany">Informe a empresa terceirizada *</label><input id="otherCompany" placeholder="Nome da empresa"></div>
       <div class="field hidden" id="name-wrap"><label for="name">Nome do colaborador *</label><input id="name" placeholder="Nome completo"><span class="hint" id="name-hint">Para vínculo próprio, o nome será buscado pela matrícula.</span></div>
       <div class="field" id="sector-wrap"><label for="sector">Setor de destino *</label><select id="sector"><option value="">Carregando setores…</option></select></div>
       <div class="field hidden" id="other-sector-wrap"><label for="otherSector">Informe o setor assistencial *</label><input id="otherSector" placeholder="Nome do setor"></div>
-      <div class="field" id="role-wrap"><label for="role">Função</label><select id="role"><option value="">Selecione o setor primeiro</option></select><span class="hint">A lista de EPIs será filtrada pela matriz de setor e função.</span></div>
+      
       <div class="field hidden" id="due-wrap"><label for="dueDate">Devolução prevista *</label><input id="dueDate" type="date"></div>
       <div class="field hidden" id="return-wrap"><label for="loanId">Empréstimo a devolver *</label><select id="loanId"><option value="">Carregando empréstimos…</option></select></div>
-      <div class="field"><label for="responsible">Responsável pela entrega/registro *</label><input id="responsible" placeholder="Nome do responsável"></div>
+      <div class="field"><label for="responsible">Responsável pela entrega/registro *</label><select id="responsible"><option value="">Selecione</option><option>CÍCERA FEITOSA ALBUQUERQUE</option><option>DANIEL JAMESSON BEZERRA DANTAS</option><option>FÁBIO UNIAS DE LIMA</option><option>ANTONIO NASCIMENTO LACERDA</option><option>THAÍS PEREIRA CAVALCANTI SAMPAIO</option><option value="OUTRO">OUTRO</option></select></div>
+      <div class="field hidden" id="other-responsible-wrap"><label for="otherResponsible">Informe o responsável *</label><input id="otherResponsible" placeholder="Nome completo"></div>
     </div>
   </section>
   <section class="card" id="items-section">
     <h2>2. Itens da movimentação</h2>
-    <div class="hint" style="margin:-8px 0 14px">Escolha EPI permitido para o setor/função ou outro material do catálogo do almox. Tamanho e CA são registrados por item.</div>
+    <div class="hint" style="margin:-8px 0 14px">Escolha um EPI permitido para o setor ou descreva outro material, como luminária, fita antiderrapante, cone ou placa. Tamanho e CA são registrados por item.</div>
     <div id="items" class="item-list"></div>
     <div class="actions"><button type="button" id="add-item" class="secondary">＋ Adicionar item</button><span class="hint">O código do almox é cruzado automaticamente quando a descrição identifica um único produto.</span></div>
   </section>
@@ -72,8 +74,9 @@
     $('operation').addEventListener('change', syncOperation);
     $('recipientType').addEventListener('change', syncRecipient);
     $('link').addEventListener('change', syncLink);
-    $('sector').addEventListener('change', () => { syncOtherSector(); loadRoles(); refreshItemOptions(); });
-    $('role').addEventListener('change', refreshItemOptions);
+    $('sector').addEventListener('change', () => { syncOtherSector(); refreshItemOptions(); });
+    $('company').addEventListener('change', syncCompany);
+    $('responsible').addEventListener('change', syncResponsible);
     $('matricula').addEventListener('change', findEmployee);
     $('add-item').addEventListener('click', () => addItem());
     $('submit').addEventListener('click', submit);
@@ -82,8 +85,7 @@
       const sectorOptions=data.sectors.map(s=>s);
       sectorOptions.push({value:'__OUTRO__',label:'Outro setor assistencial…'});
       setOptions($('sector'),sectorOptions,'Selecione o setor');
-      setOptions($('role'),[],'Selecione o setor primeiro');
-      loadOpenLoans(); addItem(); syncRecipient(); syncOperation();
+      loadOpenLoans(); addItem(); syncRecipient(); syncOperation(); syncCompany(); syncResponsible();
     }).withFailureHandler(err=>showMessage(err.message||String(err),false)).getBootstrapData();
   }
   function syncOperation(){
@@ -93,7 +95,7 @@
     $('items-section').classList.toggle('hidden',returning); $('notes-section').classList.toggle('hidden',false);
     $('recipient-type-wrap').classList.toggle('hidden',returning); $('link-wrap').classList.toggle('hidden',returning);
     $('matricula-wrap').classList.toggle('hidden',returning); $('company-wrap').classList.toggle('hidden',returning); $('name-wrap').classList.toggle('hidden',returning);
-    $('sector-wrap').classList.toggle('hidden',returning); $('other-sector-wrap').classList.toggle('hidden',returning); $('role-wrap').classList.toggle('hidden',returning);
+    $('sector-wrap').classList.toggle('hidden',returning); $('other-sector-wrap').classList.toggle('hidden',returning);
     if(!returning){ syncRecipient(); refreshItemOptions(); }
     $('submit').textContent=returning?'Registrar devolução':'Registrar movimentação';
   }
@@ -102,25 +104,20 @@
     $('link-wrap').classList.toggle('hidden',sectorRecipient);
     $('matricula-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='PRÓPRIO');
     $('company-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='TERCEIRIZADO');
-    $('name-wrap').classList.toggle('hidden',sectorRecipient);
-    $('role-wrap').classList.toggle('hidden',sectorRecipient);
-    if(sectorRecipient) $('role').value='';
+    $('name-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='TERCEIRIZADO');
     if(sectorRecipient){ $('deliveryType').value='USO COLETIVO'; $('delivery-type-wrap').classList.toggle('hidden',$('operation').value!=='ENTREGA'); }
     else if($('deliveryType').value==='USO COLETIVO') $('deliveryType').value='INICIAL';
-    refreshItemOptions();
+    syncCompany(); refreshItemOptions();
   }
   function syncLink(){
     $('name').value=''; $('name').readOnly=false;
-    $('name-hint').textContent=$('link').value==='PRÓPRIO'?'Para vínculo próprio, o nome será buscado pela matrícula.':'Informe o nome completo do colaborador terceirizado.';
+    $('name-hint').textContent='Informe o nome completo do colaborador terceirizado.';
     if($('link').value==='PRÓPRIO') $('company').value='';
-    syncRecipient();
+    syncRecipient(); syncCompany();
   }
   function syncOtherSector(){ const other=$('sector').value==='__OUTRO__'; $('other-sector-wrap').classList.toggle('hidden',!other); }
-  function loadRoles(){
-    const s=$('sector').value;
-    if(!s || s==='__OUTRO__'){ setOptions($('role'),[],'Sem função cadastrada'); return; }
-    setOptions($('role'),bootstrap.functionsBySector[s]||[],'Selecione a função (opcional para setor)');
-  }
+  function syncCompany(){ const show=$('recipientType').value==='COLABORADOR' && $('link').value==='TERCEIRIZADO'; $('other-company-wrap').classList.toggle('hidden',!show || $('company').value!=='OUTRA'); }
+  function syncResponsible(){ $('other-responsible-wrap').classList.toggle('hidden',$('responsible').value!=='OUTRO'); }
   function findEmployee(){
     const matricula=$('matricula').value.trim(); if(matricula.length!==4) return;
     google.script.run.withSuccessHandler(person=>{
@@ -128,7 +125,7 @@
       clearMessage();
       const s=$('sector');
       if(Array.from(s.options).some(o=>o.value===person.sector)) s.value=person.sector;
-      syncOtherSector(); loadRoles(); $('role').value=person.role;
+      syncOtherSector();
       $('name').value=person.name; $('name').readOnly=true; $('name-hint').textContent='Nome localizado pela matrícula.';
       refreshItemOptions();
     }).withFailureHandler(err=>showMessage(err.message||String(err),false)).lookupEmployee(matricula);
@@ -151,16 +148,19 @@
   function renumberItems(){ Array.from($('items').children).forEach((el,i)=>el.querySelector('.item-head span').textContent='Item '+(i+1)); }
   function refreshItemOptions(){ Array.from($('items').children).forEach(refreshOneItem); }
   function refreshOneItem(card){
-    const kind=card.querySelector('.kind').value, select=card.querySelector('.item'), size=card.querySelector('.size');
-    const old=select.value; let items=[];
+    const kind=card.querySelector('.kind').value, current=card.querySelector('.item'), size=card.querySelector('.size');
+    const old=current.value;
+    let select=current;
+    if(kind==='EPI' && current.tagName!=='SELECT'){ const replacement=document.createElement('select'); replacement.className='item'; current.replaceWith(replacement); select=replacement; }
+    if(kind==='MATERIAL' && current.tagName!=='INPUT'){ const input=document.createElement('input'); input.className='item'; input.placeholder='Ex.: luminária, fita antiderrapante, cone, placa'; input.value=old; current.replaceWith(input); }
     if(kind==='EPI'){
-      const sector=getSector(), role=$('role').value;
+      const sector=getSector();
       if($('recipientType').value==='SETOR'){
         fillItemSelect(select,bootstrap.collectivePpe,old);
       } else if(sector){
-        google.script.run.withSuccessHandler(list=>{ fillItemSelect(select,list,old); }).withFailureHandler(err=>showMessage(err.message||String(err),false)).getAllowedPpe(sector,role,'COLABORADOR');
+        google.script.run.withSuccessHandler(list=>{ fillItemSelect(select,list,old); }).withFailureHandler(err=>showMessage(err.message||String(err),false)).getAllowedPpe(sector,'','COLABORADOR');
       } else { fillItemSelect(select,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],old); }
-    } else { items=bootstrap.catalog.map(x=>x.description); fillItemSelect(select,items,old); size.disabled=true; size.value='NA'; }
+    } else {\n      const input=document.createElement('input'); input.className='item'; input.placeholder='Ex.: luminária, fita antiderrapante, cone, placa'; input.value=old;\n      select.replaceWith(input); size.disabled=true; size.value='NA';\n    }\n    if(kind==='EPI' && !select.isConnected){ const replacement=document.createElement('select'); replacement.className='item'; replacement.innerHTML='<option value="">Selecione</option>'; card.querySelector('.item-field').appendChild(replacement); }
     if(kind==='EPI'){
       setOptions(size,bootstrap.sizes,'Selecione'); size.value='NA'; size.disabled=false;
     }
@@ -177,12 +177,12 @@
   }
   function collectPayload(){
     const op=$('operation').value, sector=getSector();
-    const p={operation:op,responsible:$('responsible').value.trim(),notes:$('notes').value.trim()};
+    const p={operation:op,responsible:$('responsible').value==='OUTRO' ? $('otherResponsible').value.trim() : $('responsible').value,notes:$('notes').value.trim()};
     if(op==='DEVOLUÇÃO'){ p.loanId=$('loanId').value; return p; }
-    p.recipientType=$('recipientType').value; p.sector=sector; p.role=$('role').value;
+    p.recipientType=$('recipientType').value; p.sector=sector;
     p.link=p.recipientType==='SETOR'?'':$('link').value;
     if(p.link==='PRÓPRIO'){p.matricula=$('matricula').value.trim();p.name=$('name').value.trim();}
-    if(p.link==='TERCEIRIZADO'){p.company=$('company').value.trim();p.name=$('name').value.trim();}
+    if(p.link==='TERCEIRIZADO'){p.company=$('company').value==='OUTRA' ? $('otherCompany').value.trim() : $('company').value;p.name=$('name').value.trim();}
     p.deliveryType=op==='ENTREGA'?$('deliveryType').value:'';
     p.dueDate=$('dueDate').value;
     p.items=Array.from($('items').children).map(card=>({
