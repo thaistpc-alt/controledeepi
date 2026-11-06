@@ -37,7 +37,7 @@
       <div class="field hidden" id="company-wrap"><label for="company">Empresa terceirizada *</label><select id="company"><option value="">Selecione</option><option>COOPERATIVA</option><option>SERVIÇOS GERAIS</option><option>SEGURANÇA</option><option>OBRAS</option><option>TRATAMENTO DE ESGOTO E ÁGUA</option><option>AR-CONDICIONADO</option><option>DEDETIZAÇÃO</option><option>ALIMENTAÇÃO</option><option>SUBESTAÇÃO</option><option>IMAGEM</option><option>HEMODIÁLISE</option><option value="OUTRA">OUTRA</option></select></div>
       <div class="field hidden" id="other-company-wrap"><label for="otherCompany">Informe a empresa terceirizada *</label><input id="otherCompany" placeholder="Nome da empresa"></div>
       <div class="field hidden" id="name-wrap"><label for="name">Nome do colaborador *</label><input id="name" placeholder="Nome completo"><span class="hint" id="name-hint">Para vínculo próprio, o nome será buscado pela matrícula.</span></div>
-      <div class="field" id="sector-wrap"><label for="sector">Setor de destino *</label><select id="sector"><option value="">Carregando setores…</option></select></div>
+      <div class="field" id="sector-wrap"><label id="sector-label" for="sector">Setor de destino *</label><select id="sector"><option value="">Carregando setores…</option></select></div>
       <div class="field hidden" id="other-sector-wrap"><label for="otherSector">Informe o setor assistencial *</label><input id="otherSector" placeholder="Nome do setor"></div>
       
       <div class="field hidden" id="due-wrap"><label for="dueDate">Devolução prevista *</label><input id="dueDate" type="date"></div>
@@ -60,7 +60,7 @@
   <div class="footer">Confira setor, item, quantidade e tamanho antes de registrar.</div>
 </main>
 <script>
-  let bootstrap = {sectors:[], functionsBySector:{}, catalog:[], sizes:[], collectivePpe:[]};
+  let bootstrap = {sectors:[], contractorSectors:[], catalog:[], sizes:[], collectivePpe:[]};
   let itemCounter = 0;
   const $ = id => document.getElementById(id);
   const setOptions = (el, rows, placeholder) => {
@@ -82,9 +82,7 @@
     $('submit').addEventListener('click', submit);
     google.script.run.withSuccessHandler(data=>{
       bootstrap=data;
-      const sectorOptions=data.sectors.map(s=>s);
-      sectorOptions.push({value:'__OUTRO__',label:'Outro setor assistencial…'});
-      setOptions($('sector'),sectorOptions,'Selecione o setor');
+      syncSectorMode();
       loadOpenLoans(); addItem(); syncRecipient(); syncOperation(); syncCompany(); syncResponsible();
     }).withFailureHandler(err=>showMessage(err.message||String(err),false)).getBootstrapData();
   }
@@ -102,6 +100,7 @@
   function syncRecipient(){
     const sectorRecipient=$('recipientType').value==='SETOR';
     $('link-wrap').classList.toggle('hidden',sectorRecipient);
+    syncSectorMode();
     $('matricula-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='PRÓPRIO');
     $('company-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='TERCEIRIZADO');
     $('name-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='TERCEIRIZADO');
@@ -115,7 +114,24 @@
     if($('link').value==='PRÓPRIO') $('company').value='';
     syncRecipient(); syncCompany();
   }
-  function syncOtherSector(){ const other=$('sector').value==='__OUTRO__'; $('other-sector-wrap').classList.toggle('hidden',!other); }
+  function syncSectorMode(){
+    const contractor=$('recipientType').value==='COLABORADOR' && $('link').value==='TERCEIRIZADO';
+    const label=$('sector-label');
+    label.textContent=contractor?'Setor responsável pela empresa prestadora de serviços *':'Setor de destino *';
+    const values=contractor?bootstrap.contractorSectors:bootstrap.sectors;
+    const options=values.map(v=>v);
+    options.push({value:'__OUTRO__',label:contractor?'OUTRA':'OUTRO'});
+    const previous=$('sector').value;
+    setOptions($('sector'),options,contractor?'Selecione o setor responsável':'Selecione o setor de destino');
+    if(options.some(o=>(o.value??o)===previous)) $('sector').value=previous;
+    syncOtherSector();
+  }
+  function syncOtherSector(){
+    const other=$('sector').value==='__OUTRO__';
+    $('other-sector-wrap').classList.toggle('hidden',!other);
+    $('otherSector').previousElementSibling.textContent=$('recipientType').value==='COLABORADOR' && $('link').value==='TERCEIRIZADO'
+      ? 'Informe o setor responsável pela prestadora *' : 'Informe o setor assistencial *';
+  }
   function syncCompany(){ const show=$('recipientType').value==='COLABORADOR' && $('link').value==='TERCEIRIZADO'; $('other-company-wrap').classList.toggle('hidden',!show || $('company').value!=='OUTRA'); }
   function syncResponsible(){ $('other-responsible-wrap').classList.toggle('hidden',$('responsible').value!=='OUTRO'); }
   function findEmployee(){
@@ -125,6 +141,7 @@
       clearMessage();
       const s=$('sector');
       if(Array.from(s.options).some(o=>o.value===person.sector)) s.value=person.sector;
+      else { s.value='__OUTRO__'; $('otherSector').value=person.sector; }
       syncOtherSector();
       $('name').value=person.name; $('name').readOnly=true; $('name-hint').textContent='Nome localizado pela matrícula.';
       refreshItemOptions();
@@ -157,12 +174,11 @@
         const select=document.createElement('select'); select.className='item'; itemField.replaceWith(select); itemField=select;
       }
       const sector=getSector();
-      if($('recipientType').value==='SETOR'){
-        fillItemSelect(itemField,bootstrap.collectivePpe,old);
-      } else if(sector){
+      if(sector){
+        const recipient=$('recipientType').value;
         google.script.run.withSuccessHandler(list=>{ fillItemSelect(itemField,list,old); })
           .withFailureHandler(err=>showMessage(err.message||String(err),false))
-          .getAllowedPpe(sector,'','COLABORADOR');
+          .getAllowedPpe(sector,'',recipient);
       } else {
         fillItemSelect(itemField,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],old);
       }
