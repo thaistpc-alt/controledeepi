@@ -61,15 +61,6 @@ function setupEpiModule() {
   return {ok:true, message:'Abas de movimentações e mapeamento do almox prontas. Complete as colunas TIPO, ITEM PADRONIZADO e TAMANHO para cruzar os códigos.'};
 }
 
-function lookupEmployee(matricula) {
-  const key = normalize_(matricula).replace(/\D/g, '');
-  if (!key) return null;
-  const rows = getMatrix_().rows;
-  const match = rows.find(r => normalize_(r[2]).replace(/\D/g, '') === key && normalize_(r[4]) === 'ATIVO');
-  if (!match) return null;
-  return {matricula: String(match[2]), name: match[3], sector: match[0], role: match[1]};
-}
-
 function getAllowedPpe(sector, role, recipientType) {
   const sheet = getSheet_(APP_CONFIG.tabs.destinationMaterials);
   if (!sheet) throw new Error('A aba DESTINO DE MATERIAIS não foi encontrada.');
@@ -141,10 +132,9 @@ function submitMovement(payload) {
     const id = Utilities.getUuid().split('-')[0].toUpperCase();
     const timestamp = new Date();
     const person = payload.recipientType === 'COLABORADOR';
-    const employee = person && payload.link === 'PRÓPRIO' ? lookupEmployee(payload.matricula) : null;
-    const sector = (employee && employee.sector) || payload.sector;
-    const role = (employee && employee.role) || payload.role || '';
-    const name = (employee && employee.name) || payload.name || '';
+    const sector = payload.sector;
+    const role = payload.role || '';
+    const name = payload.name || '';
     const company = payload.link === 'TERCEIRIZADO' ? (payload.company || '') : '';
     const recipient = person ? 'COLABORADOR' : 'SETOR';
     const movementSheet = getMovementsSheet_(true);
@@ -210,7 +200,7 @@ function validatePayload_(p) {
   if (!p.sector) throw new Error('Selecione ou informe o setor.');
   if (p.recipientType === 'COLABORADOR') {
     if (!['PRÓPRIO', 'TERCEIRIZADO'].includes(p.link)) throw new Error('Selecione o vínculo do colaborador.');
-    if (p.link === 'PRÓPRIO' && (!p.matricula || !p.name)) throw new Error('Informe uma matrícula válida de colaborador próprio.');
+    if (p.link === 'PRÓPRIO' && !p.matricula) throw new Error('Informe a matrícula do colaborador próprio.');
     if (p.link === 'TERCEIRIZADO' && (!p.company || !p.name)) throw new Error('Informe a empresa e o nome do colaborador terceirizado.');
   }
   if (p.operation === 'ENTREGA' && !['INICIAL', 'SUBSTITUIÇÃO'].includes(p.deliveryType)) throw new Error('Selecione se a entrega é inicial ou substituição.');
