@@ -16,13 +16,13 @@
     .hidden{display:none!important}.radio-row{display:flex;gap:10px;flex-wrap:wrap}.choice{border:1px solid var(--line);padding:11px 13px;border-radius:10px;display:flex;align-items:center;gap:8px;cursor:pointer}.choice input{width:auto;margin:0;accent-color:var(--blue)}
     .item-list{display:grid;gap:11px}.item-card{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fbfcff}.item-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-weight:700;font-size:14px}.item-grid{display:grid;grid-template-columns:1.1fr 2fr .75fr 1fr 1fr;gap:10px}.item-grid .field label{font-size:12px}
     button{border:0;border-radius:10px;padding:12px 16px;font-weight:700;font-size:14px;cursor:pointer}.primary{background:var(--blue);color:#fff}.secondary{background:#edf3ff;color:#204caa}.danger{background:#fff0f0;color:#ad3434;padding:7px 10px;font-size:12px}.actions{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:15px}.submit-row{display:flex;justify-content:flex-end;margin-top:20px}.status{margin-top:14px;padding:12px 14px;border-radius:10px;display:none;line-height:1.45}.status.ok{display:block;background:#eaf8ef;color:#17643a;border:1px solid #b8e4c7}.status.err{display:block;background:#fff0ef;color:#a12820;border:1px solid #f1c2be}.busy{opacity:.65;pointer-events:none}.footer{font-size:12px;color:#718096;text-align:center;margin-top:17px}
-    @media(max-width:720px){body{padding:14px 10px 32px}.hero{padding:22px}.hero h1{font-size:22px}.card{padding:17px}.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.item-grid{grid-template-columns:1fr 1fr}.item-grid .item-field{grid-column:1/-1}.actions{align-items:stretch;flex-direction:column}.actions button{width:100%}}
+    @media(max-width:720px){body{padding:12px 8px 28px}.hero{padding:20px}.hero h1{font-size:21px;line-height:1.25}.card{padding:15px}.grid{grid-template-columns:1fr;gap:12px}.field.full{grid-column:auto}.item-grid{grid-template-columns:1fr}.item-grid .item-field{grid-column:auto}.item-head{margin-bottom:9px}.actions{align-items:stretch;flex-direction:column}.actions button{width:100%}button,select,input,textarea{min-height:44px}.item-card{padding:12px}}
   </style>
 </head>
 <body>
 <main class="shell" id="app">
   <header class="hero">
-    <h1>Saída e empréstimo de itens</h1>
+    <h1>CONTROLE DE EPIs E EPCs - SESMT HRC</h1>
     <p>Registre uma entrega ou empréstimo. Inclua todos os itens na mesma movimentação; o formulário cria uma linha por item para facilitar a conferência no almox.</p>
   </header>
   <div id="message" class="status" role="status" aria-live="polite"></div>
@@ -30,10 +30,10 @@
     <h2>1. Operação e destinatário</h2>
     <div class="grid">
       <div class="field"><label for="operation">Operação *</label><select id="operation"><option value="ENTREGA">Entrega</option><option value="EMPRÉSTIMO">Empréstimo</option><option value="DEVOLUÇÃO">Devolução de empréstimo</option></select></div>
-      <div class="field" id="delivery-type-wrap"><label for="deliveryType">Tipo de entrega *</label><select id="deliveryType"><option value="INICIAL">Inicial</option><option value="SUBSTITUIÇÃO">Substituição</option><option value="USO COLETIVO">Uso coletivo / setor</option></select></div>
+      <div class="field" id="delivery-type-wrap"><label for="deliveryType">Tipo de entrega *</label><select id="deliveryType"><option value="INICIAL">Inicial</option><option value="SUBSTITUIÇÃO">Substituição</option></select></div>
       <div class="field" id="recipient-type-wrap"><label for="recipientType">Destinatário *</label><select id="recipientType"><option value="COLABORADOR">Colaborador</option><option value="SETOR">Setor / uso coletivo</option></select></div>
       <div class="field" id="link-wrap"><label for="link">Vínculo *</label><select id="link"><option value="PRÓPRIO">Próprio</option><option value="TERCEIRIZADO">Terceirizado</option></select></div>
-      <div class="field" id="matricula-wrap"><label for="matricula">Matrícula</label><input id="matricula" inputmode="numeric" maxlength="4" placeholder="4 dígitos"><span class="hint">Ao localizar a matrícula, o nome, setor e função serão preenchidos.</span></div>
+      <div class="field" id="matricula-wrap"><label for="matricula">Matrícula *</label><input id="matricula" inputmode="numeric" maxlength="4" placeholder="4 dígitos"><span class="hint">Ao localizar a matrícula, o nome, setor e função serão preenchidos.</span></div>
       <div class="field hidden" id="company-wrap"><label for="company">Empresa terceirizada *</label><select id="company"><option value="">Selecione</option><option>COOPERATIVA</option><option>SERVIÇOS GERAIS</option><option>SEGURANÇA</option><option>OBRAS</option><option>TRATAMENTO DE ESGOTO E ÁGUA</option><option>AR-CONDICIONADO</option><option>DEDETIZAÇÃO</option><option>ALIMENTAÇÃO</option><option>SUBESTAÇÃO</option><option>IMAGEM</option><option>HEMODIÁLISE</option><option value="OUTRA">OUTRA</option></select></div>
       <div class="field hidden" id="other-company-wrap"><label for="otherCompany">Informe a empresa terceirizada *</label><input id="otherCompany" placeholder="Nome da empresa"></div>
       <div class="field hidden" id="name-wrap"><label for="name">Nome do colaborador *</label><input id="name" placeholder="Nome completo"><span class="hint" id="name-hint">Para vínculo próprio, o nome será buscado pela matrícula.</span></div>
@@ -60,7 +60,7 @@
   <div class="footer">Confira setor, item, quantidade e tamanho antes de registrar.</div>
 </main>
 <script>
-  let bootstrap = {sectors:[], contractorSectors:[], catalog:[], sizes:[], collectivePpe:[]};
+  let bootstrap = {sectors:[], contractorSectors:[], catalog:[], sizes:[], otherMaterials:[], collectivePpe:[]};
   let itemCounter = 0;
   let sectorModeInitialized = false;
   let currentContractorSectorMode = false;
@@ -106,8 +106,7 @@
     $('matricula-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='PRÓPRIO');
     $('company-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='TERCEIRIZADO');
     $('name-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='TERCEIRIZADO');
-    if(sectorRecipient){ $('deliveryType').value='USO COLETIVO'; $('delivery-type-wrap').classList.toggle('hidden',$('operation').value!=='ENTREGA'); }
-    else if($('deliveryType').value==='USO COLETIVO') $('deliveryType').value='INICIAL';
+    $('delivery-type-wrap').classList.toggle('hidden',$('operation').value!=='ENTREGA');
     syncCompany(); refreshItemOptions();
   }
   function syncLink(){
@@ -156,46 +155,64 @@
     const id=++itemCounter, card=document.createElement('div'); card.className='item-card'; card.dataset.id=id;
     card.innerHTML=`<div class="item-head"><span>Item ${id}</span><button type="button" class="danger" aria-label="Remover item">Remover</button></div>
       <div class="item-grid">
-        <div class="field"><label>Tipo *</label><select class="kind"><option value="EPI">EPI</option><option value="MATERIAL">Outro material</option></select></div>
-        <div class="field item-field"><label>Descrição *</label><select class="item"><option value="">Selecione</option></select></div>
-        <div class="field"><label>Tamanho *</label><select class="size"></select></div>
-        <div class="field"><label>CA</label><input class="ca" placeholder="Número do CA"></div>
+        <div class="field"><label>Tipo *</label><select class="kind"><option value="EPI">EPI</option><option value="MATERIAL">Outros materiais</option></select></div>
+        <div class="field item-field"><label>Descrição *</label><select class="item"><option value="">Selecione</option></select><input class="item-custom hidden" placeholder="Descreva o outro material" aria-label="Descreva o outro material"></div>
+        <div class="field size-field hidden"><label>Tamanho do calçado *</label><select class="size"></select></div>
+        <div class="field ca-field"><label>CA</label><input class="ca" placeholder="Número do CA"></div>
         <div class="field"><label>Quantidade *</label><input class="quantity" type="number" min="1" step="1" value="1"></div>
       </div>`;
     card.querySelector('.danger').addEventListener('click',()=>{card.remove();renumberItems();});
     card.querySelector('.kind').addEventListener('change',()=>refreshOneItem(card));
+    card.querySelector('.item').addEventListener('change',()=>refreshOneItem(card));
     $('items').appendChild(card); refreshOneItem(card); renumberItems();
   }
   function renumberItems(){ Array.from($('items').children).forEach((el,i)=>el.querySelector('.item-head span').textContent='Item '+(i+1)); }
   function refreshItemOptions(){ Array.from($('items').children).forEach(refreshOneItem); }
   function refreshOneItem(card){
     const kind=card.querySelector('.kind').value;
-    let itemField=card.querySelector('.item');
+    const select=card.querySelector('.item');
+    const custom=card.querySelector('.item-custom');
     const size=card.querySelector('.size');
-    const old=itemField.value;
+    const sizeField=card.querySelector('.size-field');
+    const caField=card.querySelector('.ca-field');
+    const previous=select.value;
+    custom.classList.add('hidden');
+    caField.classList.toggle('hidden',kind==='MATERIAL');
     if(kind==='EPI'){
-      if(itemField.tagName!=='SELECT'){
-        const select=document.createElement('select'); select.className='item'; itemField.replaceWith(select); itemField=select;
-      }
       const sector=getSector();
       if(sector){
         const recipient=$('recipientType').value;
-        google.script.run.withSuccessHandler(list=>{ fillItemSelect(itemField,list,old); })
+        google.script.run.withSuccessHandler(list=>{ fillItemSelect(select,list,previous); updateSizeField(card); })
           .withFailureHandler(err=>showMessage(err.message||String(err),false))
           .getAllowedPpe(sector,'',recipient);
       } else {
-        fillItemSelect(itemField,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],old);
+        fillItemSelect(select,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],previous);
       }
-      setOptions(size,bootstrap.sizes,'Selecione'); size.value='NA'; size.disabled=false;
+      size.disabled=false;
+      setOptions(size,bootstrap.sizes,'Selecione o número');
     } else {
-      if(itemField.tagName!=='INPUT'){
-        const input=document.createElement('input'); input.className='item';
-        input.placeholder='Ex.: luminária, fita antiderrapante, cone, placa'; input.value=old;
-        itemField.replaceWith(input);
-      }
-      size.disabled=true; size.value='NA';
+      setOptions(select,bootstrap.otherMaterials||[],'Selecione um material');
+      if((bootstrap.otherMaterials||[]).some(x=>x.value===previous)) select.value=previous;
+      else if(previous && previous!=='OUTRO') select.value=previous;
+      custom.classList.toggle('hidden',select.value!=='OUTRO');
+      if(select.value==='OUTRO') custom.required=true;
+      else { custom.required=false; custom.value=''; }
+      size.value='NA'; size.disabled=true; sizeField.classList.add('hidden');
     }
+    updateSizeField(card);
   }
+  function updateSizeField(card){
+    const kind=card.querySelector('.kind').value;
+    const item=card.querySelector('.item').value;
+    const needs=kind==='EPI' && /\b(BOTA|BOTINA|CALCADO)\b/.test(normalizeText(item));
+    const field=card.querySelector('.size-field');
+    const size=card.querySelector('.size');
+    field.classList.toggle('hidden',!needs);
+    size.required=needs;
+    if(!needs){ size.value='NA'; size.disabled=true; }
+    else { size.disabled=false; }
+  }
+  function normalizeText(value){ return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase(); }
   function fillItemSelect(select,items,old){
     setOptions(select,items,'Selecione um item permitido');
     if(items.includes(old)) select.value=old;
@@ -217,7 +234,9 @@
     p.deliveryType=op==='ENTREGA'?$('deliveryType').value:'';
     p.dueDate=$('dueDate').value;
     p.items=Array.from($('items').children).map(card=>({
-      kind:card.querySelector('.kind').value,item:card.querySelector('.item').value,
+      kind:card.querySelector('.kind').value,
+      item:card.querySelector('.kind').value==='MATERIAL' && card.querySelector('.item').value==='OUTRO' ? card.querySelector('.item-custom').value.trim() : card.querySelector('.item').value,
+      customMaterial:card.querySelector('.kind').value==='MATERIAL' && card.querySelector('.item').value==='OUTRO',
       size:card.querySelector('.size').value||'NA',ca:card.querySelector('.ca').value.trim(),
       quantity:card.querySelector('.quantity').value
     }));
