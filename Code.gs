@@ -17,7 +17,8 @@ const APP_CONFIG = {
   occasionalCarePpe: ['ÓCULOS DE SEGURANÇA', 'PROTETOR AUDITIVO EM ESPUMA'],
   formSectors: ['CME', 'MANUTENÇÃO', 'TRANSPORTE INTERNO', 'IMAGEM-ENDOSCOPIA', 'IMAGEM-RESSONANCIA', 'CAF-SANEANTES', 'ROUPARIA', 'SESMT'],
   contractorSectors: ['MANUTENÇÃO', 'HOTELARIA', 'NAC', 'NTI', 'TRANSPORTE', 'IMAGEM', 'CME', 'GERENCIA DE ENFERMAGEM'],
-  sizes: ['NA', 'ÚNICO', 'PP', 'P', 'M', 'G', 'GG', 'XG', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'],
+  sizes: ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'],
+  otherMaterials: ['CONE', 'FITA ANTIDERRAPANTE', 'LUMINÁRIA', 'PLACA DE SINALIZAÇÃO', 'APOIO PARA OS PÉS', 'EXTINTOR', 'MANGUEIRA'],
   movementHeaders: [
     'ID MOVIMENTAÇÃO', 'DATA/HORA', 'OPERAÇÃO', 'DESTINATÁRIO', 'VÍNCULO', 'EMPRESA',
     'MATRÍCULA', 'NOME', 'SETOR', 'FUNÇÃO', 'TIPO DE ENTREGA', 'TIPO DE ITEM',
@@ -28,7 +29,7 @@ const APP_CONFIG = {
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('Saída e empréstimo de itens')
+    .setTitle('CONTROLE DE EPIs E EPCs - SESMT HRC')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -38,6 +39,7 @@ function getBootstrapData() {
     contractorSectors: APP_CONFIG.contractorSectors,
     catalog: getAlmoxCatalog_().map(x => ({code: x.code, description: x.description})),
     sizes: APP_CONFIG.sizes,
+    otherMaterials: APP_CONFIG.otherMaterials.map(item => ({value:item,label:item === 'LUMINÁRIA' ? 'LUMINÁRIA DE EMERGÊNCIA' : item})).concat([{value:'OUTRO',label:'OUTRO'}]),
     collectivePpe: APP_CONFIG.collectivePpe
   };
 }
@@ -77,7 +79,7 @@ function getAllowedPpe(sector, role, recipientType) {
   const wanted = recipientType === 'SETOR' ? 'COLETIVO' : 'INDIVIDUAL';
   const destination = String(sector || '').trim();
   return unique_(rows.filter(r => {
-    if (!r[0] || !r[1] || !r[2]) return false;
+    if (!r[0] || !r[1] || !r[2] || isOtherMaterial_(r[0])) return false;
     const exits = normalizeExitType_(r[1]);
     if (!exits.includes(wanted)) return false;
     return String(r[2]).split(',').some(clause => destinationClauseApplies_(clause, destination, wanted));
@@ -199,7 +201,7 @@ function registerReturn_(payload) {
 
 function validatePayload_(p) {
   if (!p || !['ENTREGA', 'EMPRÉSTIMO', 'DEVOLUÇÃO'].includes(p.operation)) throw new Error('Selecione a operação.');
-  if (!p.responsible || !String(p.responsible).trim()) throw new Error('Informe quem está registrando a movimentação.');
+  if (!p.responsible || !String(p.responsible).trim()) throw new Error('Selecione quem está registrando a movimentação.');
   if (p.operation === 'DEVOLUÇÃO') {
     if (!p.loanId) throw new Error('Selecione o empréstimo que está sendo devolvido.');
     return;
@@ -208,19 +210,43 @@ function validatePayload_(p) {
   if (!p.sector) throw new Error('Selecione ou informe o setor.');
   if (p.recipientType === 'COLABORADOR') {
     if (!['PRÓPRIO', 'TERCEIRIZADO'].includes(p.link)) throw new Error('Selecione o vínculo do colaborador.');
-    if (p.link === 'PRÓPRIO' && (!p.matricula || !p.name)) throw new Error('Informe a matrícula e o nome do colaborador próprio.');
+    if (p.link === 'PRÓPRIO' && (!p.matricula || !p.name)) throw new Error('Informe uma matrícula válida de colaborador próprio.');
     if (p.link === 'TERCEIRIZADO' && (!p.company || !p.name)) throw new Error('Informe a empresa e o nome do colaborador terceirizado.');
   }
-  if (p.operation === 'ENTREGA' && !p.deliveryType) throw new Error('Informe se a entrega é inicial, substituição ou para uso coletivo.');
+  if (p.operation === 'ENTREGA' && !['INICIAL', 'SUBSTITUIÇÃO'].includes(p.deliveryType)) throw new Error('Selecione se a entrega é inicial ou substituição.');
   if (p.operation === 'EMPRÉSTIMO' && !p.dueDate) throw new Error('Informe a data prevista para devolução.');
   if (!Array.isArray(p.items) || !p.items.length) throw new Error('Adicione pelo menos um item.');
   const allowed = getAllowedPpe(p.sector, '', p.recipientType);
   p.items.forEach(line => {
-    if (!line.item || !['EPI', 'MATERIAL'].includes(line.kind)) throw new Error('Confira o tipo e a descrição de cada item.');
+    if (!line || !line.item || !['EPI', 'MATERIAL'].includes(line.kind)) throw new Error('Preencha o tipo e a descrição de cada item.');
     if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) < 1) throw new Error('A quantidade precisa ser um número inteiro maior que zero.');
-    if (!line.size) line.size = 'NA';
-    if (line.kind === 'EPI' && !allowed.includes(line.item)) throw new Error('O EPI selecionado não consta como permitido para esse setor/função.');
+    if (line.kind === 'EPI') {
+      if (!allowed.includes(line.item)) throw new Error('O EPI selecionado não consta como permitido para esse setor e tipo de saída.');
+      if (requiresNumericSize_(line.item)) {
+        if (!APP_CONFIG.sizes.includes(String(line.size || ''))) throw new Error('Selecione o número do calçado/bota.');
+      } else {
+        line.size = 'NA';
+      }
+    } else {
+      const isCustom = line.customMaterial === true;
+      const canonical = String(line.item).trim();
+      if (isCustom && !canonical) throw new Error('Informe a descrição do outro material.');
+      if (!isCustom && !APP_CONFIG.otherMaterials.includes(canonical)) throw new Error('Selecione um material válido.');
+      line.size = 'NA';
+      line.ca = '';
+    }
   });
+}
+
+function isOtherMaterial_(item) {
+  const value = normalize_(item);
+  return APP_CONFIG.otherMaterials.some(x => normalize_(x) === value) ||
+    value === normalize_('LUMINÁRIA DE EMERGÊNCIA');
+}
+
+function requiresNumericSize_(item) {
+  const value = normalize_(item);
+  return /\bBOTA\b/.test(value) || /\bCALCADO\b/.test(value) || /\bBOTINA\b/.test(value);
 }
 
 function resolveAlmoxCode_(line, catalog) {
