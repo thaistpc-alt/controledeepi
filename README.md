@@ -11,14 +11,14 @@ Aplicação web do Google Apps Script para registrar entregas individuais e cole
 - Entrega inicial, substituição, empréstimo com previsão de devolução e registro de devolução por item emprestado.
 - Itens adicionais selecionados do catálogo `CÓD. ALMOX`.
 - Tamanho padronizado e quantidade validada como inteiro positivo. CA e observações são guardados por item.
-- Grava o histórico completo na aba `MOVIMENTAÇÕES EPI` e prepara uma linha por item na aba `LANÇAR ALMOX`.
+- Grava o histórico completo na aba `MOVIMENTAÇÕES EPI` e prepara uma linha por item na aba `CONTROLE ALMOX`, com caixa de seleção para marcar o lançamento.
 
 ## Configuração
 
 1. Abra o projeto Apps Script vinculado à planilha de controle.
 2. Adicione `Code.gs`, `Index.html` e este `appsscript.json` ao projeto.
 3. Em **Configurações do projeto > Propriedades do script**, crie `SPREADSHEET_ID` com o ID da planilha de controle. O ID não deve ser commitado no repositório.
-4. Execute `setupEpiModule()` uma vez. A função cria `MOVIMENTAÇÕES EPI` e `MAPEAMENTO ALMOX`; o catálogo de produtos e códigos do almox é copiado para as duas colunas de referência dessa aba.
+4. Execute `setupEpiModule()` uma vez. A função prepara `MOVIMENTAÇÕES EPI`, `CONTROLE ALMOX` e `MAPEAMENTO ALMOX`, e instala os acionadores para ocultar linhas marcadas como lançadas e adicionar o menu de exibição.
 5. Na aba `MAPEAMENTO ALMOX`, relacione cada EPI padronizado ao produto correto do almox. Preencha `TIPO` com `EPI`, o nome usado na matriz em `ITEM PADRONIZADO`, `TAMANHO` (use `NA` quando não se aplica), e marque `ATIVO?` como `SIM`. A descrição e o código do produto devem corresponder ao catálogo do almox.
 6. Implantar como **Aplicativo da Web**, executando como a pessoa responsável pela implantação e restringindo o acesso ao domínio institucional.
 
@@ -32,6 +32,11 @@ O código-fonte não contém o ID da planilha, credenciais ou dados de colaborad
 
 ## Estrutura
 
-- `Code.gs` — leitura da matriz e catálogo, validações, movimentações e devoluções.
+- `Code.gs` — leitura da matriz e catálogo, validações, movimentações, devoluções e fila de lançamentos no almox.
 - `Index.html` — interface responsiva do formulário.
 - `appsscript.json` — configuração do projeto e acesso do aplicativo web.
+
+
+## Controle do almox
+
+Cada item enviado pelo formulário entra como uma linha em `CONTROLE ALMOX`, com data/hora, setor, tipo, item, tamanho, quantidade, código do almox e a caixa `LANÇADO NO ALMOX?`. Marcar a caixa oculta a linha sem apagá-la. Use o menu **Controle Almox > Exibir todos os registros (inclui lançados)** para consultar os itens concluídos. Após atualizar o script, execute `setupEpiModule()` novamente para criar os acionadores necessários e implante uma nova versão do aplicativo web.
