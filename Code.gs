@@ -22,8 +22,8 @@ const APP_CONFIG = {
   movementHeaders: [
     'ID MOVIMENTAÇÃO', 'DATA/HORA', 'OPERAÇÃO', 'DESTINATÁRIO', 'VÍNCULO', 'EMPRESA',
     'MATRÍCULA', 'NOME', 'SETOR', 'FUNÇÃO', 'TIPO DE ENTREGA', 'TIPO DE ITEM',
-    'ITEM', 'TAMANHO', 'CA', 'QUANTIDADE', 'CÓD. ALMOX', 'STATUS',
-    'DEVOLUÇÃO PREVISTA', 'ID DO EMPRÉSTIMO', 'RESPONSÁVEL', 'OBSERVAÇÃO'
+    'ITEM', 'TAMANHO', 'CA', 'QUANTIDADE', 'DEVOLUÇÃO PREVISTA', 'ID DO EMPRÉSTIMO',
+    'RESPONSÁVEL', 'OBSERVAÇÃO'
   ]
 };
 
@@ -112,11 +112,11 @@ function getOpenLoans() {
   const open = new Map();
   rows.forEach(r => {
     const op = r[2];
-    const status = r[17];
-    if (op === 'EMPRÉSTIMO' && status === 'EM ABERTO') {
-      open.set(r[19], {id: r[19], item: r[12], kind: r[11], size: r[13], ca: r[14], qty: r[15], recipient: r[3], sector: r[8], due: r[18]});
-    } else if (op === 'DEVOLUÇÃO' && r[19]) {
-      open.delete(r[19]);
+    const loanId = r[17];
+    if (op === 'EMPRÉSTIMO' && loanId) {
+      open.set(loanId, {id: loanId, item: r[12], kind: r[11], size: r[13], ca: r[14], qty: r[15], recipient: r[3], sector: r[8], due: r[16]});
+    } else if (op === 'DEVOLUÇÃO' && loanId) {
+      open.delete(loanId);
     }
   });
   return Array.from(open.values());
@@ -143,14 +143,12 @@ function submitMovement(payload) {
     const records = [];
 
     payload.items.forEach((line, index) => {
-      const code = resolveAlmoxCode_(line, catalog);
       const loanId = payload.operation === 'EMPRÉSTIMO' ? id + '-' + (index + 1) : '';
-      const status = payload.operation === 'EMPRÉSTIMO' ? 'EM ABERTO' : (code === 'CONFERIR' ? 'CONFERIR CÓDIGO' : 'PENDENTE NO ALMOX');
       records.push([
         id, timestamp, payload.operation, recipient, payload.link || '', company,
         person ? (payload.link === 'PRÓPRIO' ? payload.matricula : '') : '',
         person ? name : '', sector, role, payload.deliveryType || '', line.kind, line.item,
-        line.size || 'NA', line.ca || '', Number(line.quantity), code, status,
+        line.size || 'NA', line.ca || '', Number(line.quantity),
         payload.dueDate || '', loanId, payload.responsible, payload.notes || ''
       ]);
     });
@@ -182,8 +180,8 @@ function registerReturn_(payload) {
   const id = Utilities.getUuid().split('-')[0].toUpperCase();
   const row = [
     id, new Date(), 'DEVOLUÇÃO', loan.recipient === 'SETOR' ? 'SETOR' : 'COLABORADOR', '', '', '', '',
-    loan.sector, '', '', loan.kind || 'EPI', loan.item, loan.size || 'NA', loan.ca || '', Number(loan.qty), '', 'DEVOLVIDO', '',
-    loan.id, payload.responsible, payload.notes || ''
+    loan.sector, '', '', loan.kind || 'EPI', loan.item, loan.size || 'NA', loan.ca || '', Number(loan.qty),
+    '', loan.id, payload.responsible, payload.notes || ''
   ];
   sheet.appendRow(row);
   return {ok: true, id, message: 'Devolução registrada.'};
