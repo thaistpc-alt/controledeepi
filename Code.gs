@@ -21,7 +21,7 @@ const APP_CONFIG = {
   otherMaterials: ['CONE', 'FITA ANTIDERRAPANTE', 'LUMINÁRIA', 'PLACA DE SINALIZAÇÃO', 'APOIO PARA OS PÉS', 'EXTINTOR', 'MANGUEIRA'],
   movementHeaders: [
     'ID MOVIMENTAÇÃO', 'DATA/HORA', 'OPERAÇÃO', 'DESTINATÁRIO', 'VÍNCULO', 'EMPRESA',
-    'MATRÍCULA', 'NOME', 'SETOR', 'FUNÇÃO', 'TIPO DE ENTREGA', 'TIPO DE ITEM',
+    'MATRÍCULA', 'NOME', 'SETOR', 'TIPO DE ENTREGA', 'TIPO DE ITEM',
     'ITEM', 'TAMANHO', 'CA', 'QUANTIDADE', 'DEVOLUÇÃO PREVISTA', 'ID DO EMPRÉSTIMO',
     'RESPONSÁVEL', 'OBSERVAÇÃO'
   ]
@@ -114,9 +114,9 @@ function getOpenLoans() {
   const open = new Map();
   rows.forEach(r => {
     const op = r[2];
-    const loanId = r[17];
+    const loanId = r[16];
     if (op === 'EMPRÉSTIMO' && loanId) {
-      open.set(loanId, {id: loanId, item: r[12], kind: r[11], size: r[13], ca: r[14], qty: r[15], recipient: r[3], sector: r[8], due: r[16]});
+      open.set(loanId, {id: loanId, item: r[11], kind: r[10], size: r[12], ca: r[13], qty: r[14], recipient: r[3], sector: r[8], due: r[15]});
     } else if (op === 'DEVOLUÇÃO' && loanId) {
       open.delete(loanId);
     }
@@ -135,7 +135,6 @@ function submitMovement(payload) {
     const timestamp = new Date();
     const person = payload.recipientType === 'COLABORADOR';
     const sector = payload.sector;
-    const role = payload.role || '';
     const name = payload.name || '';
     const company = payload.link === 'TERCEIRIZADO' ? (payload.company || '') : '';
     const recipient = person ? 'COLABORADOR' : 'SETOR';
@@ -149,7 +148,7 @@ function submitMovement(payload) {
       records.push([
         id, timestamp, payload.operation, recipient, payload.link || '', company,
         person ? (payload.link === 'PRÓPRIO' ? payload.matricula : '') : '',
-        person ? name : '', sector, role, payload.deliveryType || '', line.kind, line.item,
+        person ? name : '', sector, payload.deliveryType || '', line.kind, line.item,
         line.size || 'NA', line.ca || '', Number(line.quantity),
         payload.dueDate || '', loanId, payload.responsible, payload.notes || ''
       ]);
@@ -184,7 +183,7 @@ function registerReturn_(payload) {
   const id = Utilities.getUuid().split('-')[0].toUpperCase();
   const row = [
     id, new Date(), 'DEVOLUÇÃO', loan.recipient === 'SETOR' ? 'SETOR' : 'COLABORADOR', '', '', '', '',
-    loan.sector, '', '', loan.kind || 'EPI', loan.item, loan.size || 'NA', loan.ca || '', Number(loan.qty),
+    loan.sector, '', loan.kind || 'EPI', loan.item, loan.size || 'NA', loan.ca || '', Number(loan.qty),
     '', loan.id, payload.responsible, payload.notes || ''
   ];
   sheet.appendRow(row);
