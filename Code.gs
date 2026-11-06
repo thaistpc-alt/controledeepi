@@ -244,8 +244,11 @@ function getMovementsSheet_(create) {
 }
 
 function getSpreadsheet_() {
-  const id = PropertiesService.getScriptProperties().getProperty(APP_CONFIG.propertyKey);
-  if (!id) throw new Error('Configure a propriedade SPREADSHEET_ID nas propriedades do projeto Apps Script.');
+  const configured = PropertiesService.getScriptProperties().getProperty(APP_CONFIG.propertyKey);
+  if (!configured) throw new Error('Configure a propriedade SPREADSHEET_ID nas propriedades do projeto Apps Script.');
+  // Aceita tanto o ID puro quanto a URL completa da planilha.
+  const match = String(configured).trim().match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  const id = match ? match[1] : String(configured).trim();
   return SpreadsheetApp.openById(id);
 }
 
