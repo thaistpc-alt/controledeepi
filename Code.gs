@@ -5,7 +5,8 @@ const APP_CONFIG = {
     almoxCatalog: 'CÓD. ALMOX',
     almoxQueue: 'LANÇAR ALMOX',
     codeMap: 'MAPEAMENTO ALMOX',
-    movements: 'MOVIMENTAÇÕES EPI'
+    movements: 'MOVIMENTAÇÕES EPI',
+    destinationMaterials: 'DESTINO DE MATERIAIS'
   },
   collectivePpe: [
     'AVENTAL PLUMBÍFERO',
@@ -14,6 +15,8 @@ const APP_CONFIG = {
     'PROTETOR AUDITIVO EM ESPUMA'
   ],
   occasionalCarePpe: ['ÓCULOS DE SEGURANÇA', 'PROTETOR AUDITIVO EM ESPUMA'],
+  formSectors: ['CME', 'MANUTENÇÃO', 'TRANSPORTE INTERNO', 'IMAGEM-ENDOSCOPIA', 'IMAGEM-RESSONANCIA', 'CAF-SANEANTES', 'ROUPARIA', 'SESMT'],
+  contractorSectors: ['MANUTENÇÃO', 'HOTELARIA', 'NAC', 'NTI', 'TRANSPORTE', 'IMAGEM', 'CME', 'GERENCIA DE ENFERMAGEM'],
   sizes: ['NA', 'ÚNICO', 'PP', 'P', 'M', 'G', 'GG', 'XG', '34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'],
   movementHeaders: [
     'ID MOVIMENTAÇÃO', 'DATA/HORA', 'OPERAÇÃO', 'DESTINATÁRIO', 'VÍNCULO', 'EMPRESA',
@@ -30,18 +33,9 @@ function doGet() {
 }
 
 function getBootstrapData() {
-  const matrix = getMatrix_();
-  const sectors = unique_(matrix.rows.map(r => r[0]).filter(Boolean));
-  const functionsBySector = {};
-  matrix.rows.forEach(r => {
-    if (!r[0] || !r[1]) return;
-    functionsBySector[r[0]] = functionsBySector[r[0]] || [];
-    functionsBySector[r[0]].push(r[1]);
-  });
-  Object.keys(functionsBySector).forEach(k => functionsBySector[k] = unique_(functionsBySector[k]));
   return {
-    sectors,
-    functionsBySector,
+    sectors: APP_CONFIG.formSectors,
+    contractorSectors: APP_CONFIG.contractorSectors,
     catalog: getAlmoxCatalog_().map(x => ({code: x.code, description: x.description})),
     sizes: APP_CONFIG.sizes,
     collectivePpe: APP_CONFIG.collectivePpe
@@ -51,6 +45,7 @@ function getBootstrapData() {
 function setupEpiModule() {
   const ss = getSpreadsheet_();
   getMovementsSheet_(true);
+  ensureDestinationMaterialsSheet_(ss);
   let map = ss.getSheetByName(APP_CONFIG.tabs.codeMap);
   if (!map) {
     map = ss.insertSheet(APP_CONFIG.tabs.codeMap);
@@ -74,13 +69,42 @@ function lookupEmployee(matricula) {
 }
 
 function getAllowedPpe(sector, role, recipientType) {
-  const s = String(sector || '').trim();
-  const f = String(role || '').trim();
-  if (recipientType === 'SETOR') return APP_CONFIG.collectivePpe.slice();
-  const rows = getMatrix_().rows.filter(r => r[0] === s && (!f || r[1] === f));
-  let items = unique_(rows.map(r => r[5]).filter(Boolean));
-  if (!items.length) items = APP_CONFIG.occasionalCarePpe.slice();
-  return items;
+  const sheet = getSheet_(APP_CONFIG.tabs.destinationMaterials);
+  if (!sheet) throw new Error('A aba DESTINO DE MATERIAIS não foi encontrada.');
+  const last = sheet.getLastRow();
+  if (last < 2) return [];
+  const rows = sheet.getRange(2, 1, last - 1, 3).getDisplayValues();
+  const wanted = recipientType === 'SETOR' ? 'COLETIVO' : 'INDIVIDUAL';
+  const destination = String(sector || '').trim();
+  return unique_(rows.filter(r => {
+    if (!r[0] || !r[1] || !r[2]) return false;
+    const exits = normalize_(r[1]).replace(/INDIDIVIDUAL/g, 'INDIVIDUAL');
+    if (!exits.includes(wanted)) return false;
+    return String(r[2]).split(',').some(clause => destinationClauseApplies_(clause, destination, wanted));
+  }).map(r => r[0]));
+}
+
+function destinationClauseApplies_(clause, sector, wanted) {
+  const normalizedClause = normalize_(clause);
+  const hasUsageQualifier = normalizedClause.includes('INDIVIDUAL') || normalizedClause.includes('COLETIVO');
+  if (hasUsageQualifier && !normalizedClause.includes(wanted)) return false;
+  let target = normalizedClause
+    .replace(/\bINDIVIDUAL\b/g, ' ')
+    .replace(/\bCOLETIVO\b/g, ' ')
+    .replace(/\bSETOR\b/g, ' ')
+    .replace(/\bTODOS OS SETORES\b/g, 'TODOS');
+  if (target.includes('TODOS')) return true;
+  const selected = normalize_(sector);
+  if (!selected) return false;
+  const aliases = {
+    'HOTELARIA': ['ROUPARIA'],
+    'ROUPARIA': ['HOTELARIA'],
+    'TRANSPORTE INTERNO': ['TRANSPORTE'],
+    'IMAGEM ENDOSCOPIA': ['IMAGEM'],
+    'IMAGEM RESSONANCIA': ['IMAGEM']
+  };
+  const candidates = [selected].concat(aliases[selected] || []);
+  return candidates.some(value => target.includes(value) || value.includes(target.trim()));
 }
 
 function getOpenLoans() {
@@ -185,7 +209,7 @@ function validatePayload_(p) {
   if (p.operation === 'ENTREGA' && !p.deliveryType) throw new Error('Informe se a entrega é inicial, substituição ou para uso coletivo.');
   if (p.operation === 'EMPRÉSTIMO' && !p.dueDate) throw new Error('Informe a data prevista para devolução.');
   if (!Array.isArray(p.items) || !p.items.length) throw new Error('Adicione pelo menos um item.');
-  const allowed = p.recipientType === 'SETOR' ? APP_CONFIG.collectivePpe : getAllowedPpe(p.sector, '');
+  const allowed = getAllowedPpe(p.sector, '', p.recipientType);
   p.items.forEach(line => {
     if (!line.item || !['EPI', 'MATERIAL'].includes(line.kind)) throw new Error('Confira o tipo e a descrição de cada item.');
     if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) < 1) throw new Error('A quantidade precisa ser um número inteiro maior que zero.');
@@ -227,6 +251,18 @@ function getAlmoxCatalog_() {
   return sheet.getRange(3, 1, last - 2, 2).getDisplayValues()
     .filter(r => r[0] && r[1])
     .map(r => ({code: String(r[0]).trim(), description: String(r[1]).trim()}));
+}
+
+function ensureDestinationMaterialsSheet_(ss) {
+  let sheet = ss.getSheetByName(APP_CONFIG.tabs.destinationMaterials);
+  if (!sheet) {
+    sheet = ss.insertSheet(APP_CONFIG.tabs.destinationMaterials);
+    const headers = ['DESCRIÇÃO', 'SAÍDA', 'DESTINO'];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#e8efff');
+  }
+  return sheet;
 }
 
 function getMovementsSheet_(create) {
