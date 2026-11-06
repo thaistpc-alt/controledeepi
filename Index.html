@@ -35,8 +35,8 @@
       <div class="field" id="recipient-type-wrap"><label for="recipientType">Destinatário *</label><select id="recipientType"><option value="COLABORADOR">Colaborador</option><option value="SETOR">Setor / uso coletivo</option></select></div>
       <div class="field" id="link-wrap"><label for="link">Vínculo *</label><select id="link"><option value="PRÓPRIO">Próprio</option><option value="TERCEIRIZADO">Terceirizado</option></select></div>
       <div class="field" id="matricula-wrap"><label for="matricula">Matrícula *</label><input id="matricula" inputmode="numeric" maxlength="4" placeholder="Digite a matrícula"></div>
-      <div class="field hidden" id="company-wrap"><label for="company">Empresa terceirizada *</label><select id="company"><option value="">Selecione</option><option>COOPERATIVA</option><option>SERVIÇOS GERAIS</option><option>SEGURANÇA</option><option>OBRAS</option><option>TRATAMENTO DE ESGOTO E ÁGUA</option><option>AR-CONDICIONADO</option><option>DEDETIZAÇÃO</option><option>ALIMENTAÇÃO</option><option>SUBESTAÇÃO</option><option>IMAGEM</option><option>HEMODIÁLISE</option><option value="OUTRA">OUTRA</option></select></div>
-      <div class="field hidden" id="other-company-wrap"><label for="otherCompany">Informe a empresa terceirizada *</label><input id="otherCompany" placeholder="Nome da empresa"></div>
+      <div class="field hidden" id="activity-wrap"><label for="activity">Atuação *</label><select id="activity"><option value="">Selecione</option></select></div>
+      <div class="field hidden" id="company-wrap"><label for="company">EMPRESA *</label><input id="company" placeholder="Digite o nome da empresa"></div>
       <div class="field hidden" id="name-wrap"><label for="name">Nome do colaborador *</label><input id="name" placeholder="Nome completo"><span class="hint" id="name-hint">Para vínculo próprio, o nome será buscado pela matrícula.</span></div>
       <div class="field" id="sector-wrap"><label id="sector-label" for="sector">Setor de destino *</label><select id="sector"><option value="">Carregando setores…</option></select></div>
       <div class="field hidden" id="other-sector-wrap"><label for="otherSector">Informe o setor assistencial *</label><input id="otherSector" placeholder="Nome do setor"></div>
@@ -78,12 +78,12 @@
     $('recipientType').addEventListener('change', syncRecipient);
     $('link').addEventListener('change', syncLink);
     $('sector').addEventListener('change', () => { syncOtherSector(); refreshItemOptions(); });
-    $('company').addEventListener('change', syncCompany);
     $('responsible').addEventListener('change', syncResponsible);
     $('add-item').addEventListener('click', () => addItem());
     $('submit').addEventListener('click', submit);
     google.script.run.withSuccessHandler(data=>{
       bootstrap=data;
+      setOptions($('activity'),bootstrap.contractorActivities||[],'Selecione a atuação');
       syncSectorMode();
       loadOpenLoans(); addItem(); syncRecipient(); syncOperation(); syncCompany(); syncResponsible();
     }).withFailureHandler(err=>showMessage(err.message||String(err),false)).getBootstrapData();
@@ -94,7 +94,7 @@
     $('due-wrap').classList.toggle('hidden',!loan); $('return-wrap').classList.toggle('hidden',!returning);
     $('items-section').classList.toggle('hidden',returning); $('notes-section').classList.toggle('hidden',false);
     $('recipient-type-wrap').classList.toggle('hidden',returning); $('link-wrap').classList.toggle('hidden',returning);
-    $('matricula-wrap').classList.toggle('hidden',returning); $('company-wrap').classList.toggle('hidden',returning); $('name-wrap').classList.toggle('hidden',returning);
+    $('matricula-wrap').classList.toggle('hidden',returning); $('company-wrap').classList.toggle('hidden',returning); $('activity-wrap').classList.toggle('hidden',returning); $('name-wrap').classList.toggle('hidden',returning);
     $('sector-wrap').classList.toggle('hidden',returning); $('other-sector-wrap').classList.toggle('hidden',returning);
     if(!returning){ syncRecipient(); refreshItemOptions(); }
     $('submit').textContent=returning?'Registrar devolução':'Registrar movimentação';
@@ -104,14 +104,14 @@
     $('link-wrap').classList.toggle('hidden',sectorRecipient);
     syncSectorMode();
     $('matricula-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='PRÓPRIO');
-    $('company-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='TERCEIRIZADO');
+    syncCompany();
     $('name-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='TERCEIRIZADO');
     $('delivery-type-wrap').classList.toggle('hidden',$('operation').value!=='ENTREGA');
     syncCompany(); refreshItemOptions();
   }
   function syncLink(){
     $('name').value=''; $('name').readOnly=false;
-    if($('link').value==='PRÓPRIO') $('company').value='';
+    if($('link').value==='PRÓPRIO'){ $('company').value=''; $('activity').value=''; }
     syncRecipient(); syncCompany();
   }
   function syncSectorMode(){
@@ -134,7 +134,7 @@
     $('otherSector').previousElementSibling.textContent=$('recipientType').value==='COLABORADOR' && $('link').value==='TERCEIRIZADO'
       ? 'Informe o setor responsável pela prestadora *' : 'Informe o setor assistencial *';
   }
-  function syncCompany(){ const show=$('recipientType').value==='COLABORADOR' && $('link').value==='TERCEIRIZADO'; $('other-company-wrap').classList.toggle('hidden',!show || $('company').value!=='OUTRA'); }
+  function syncCompany(){ const show=$('recipientType').value==='COLABORADOR' && $('link').value==='TERCEIRIZADO' && $('operation').value!=='DEVOLUÇÃO'; $('activity-wrap').classList.toggle('hidden',!show); $('company-wrap').classList.toggle('hidden',!show); }
   function syncResponsible(){ $('other-responsible-wrap').classList.toggle('hidden',$('responsible').value!=='OUTRO'); }
   function getSector(){ return $('sector').value==='__OUTRO__' ? $('otherSector').value.trim() : $('sector').value; }
   function addItem(){
@@ -226,7 +226,7 @@
     p.recipientType=$('recipientType').value; p.sector=sector;
     p.link=p.recipientType==='SETOR'?'':$('link').value;
     if(p.link==='PRÓPRIO'){p.matricula=$('matricula').value.trim();}
-    if(p.link==='TERCEIRIZADO'){p.company=$('company').value==='OUTRA' ? $('otherCompany').value.trim() : $('company').value;p.name=$('name').value.trim();}
+    if(p.link==='TERCEIRIZADO'){p.activity=$('activity').value;p.company=$('company').value.trim();p.name=$('name').value.trim();}
     p.deliveryType=op==='ENTREGA'?$('deliveryType').value:'';
     p.dueDate=$('dueDate').value;
     p.items=Array.from($('items').children).map(card=>({
