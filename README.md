@@ -39,4 +39,4 @@ O código-fonte não contém o ID da planilha, credenciais ou dados de colaborad
 
 ## Controle do almox
 
-Cada item enviado pelo formulário entra como uma linha em `CONTROLE ALMOX`, com data/hora, setor, tipo, item, tamanho, quantidade, código do almox e a caixa `LANÇADO NO ALMOX?`. Marcar a caixa oculta a linha sem apagá-la. Use o menu **Controle Almox > Exibir todos os registros (inclui lançados)** para consultar os itens concluídos. Após atualizar o script, execute `setupEpiModule()` novamente para criar os acionadores necessários e implante uma nova versão do aplicativo web.
+Cada item enviado pelo formulário entra como uma linha em `CONTROLE ALMOX`, com data/hora, setor, item, tamanho, quantidade, código do almox, caixa `LANÇADO NO ALMOX?` e observação. Marcar a caixa oculta a linha sem apagá-la. Use o menu **Controle Almox > Exibir todos os registros (inclui lançados)** para consultar os itens concluídos. Após atualizar o script, execute `setupEpiModule()` novamente para criar os acionadores necessários e implante uma nova versão do aplicativo web.
