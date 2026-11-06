@@ -185,9 +185,7 @@ function validatePayload_(p) {
   if (p.operation === 'ENTREGA' && !p.deliveryType) throw new Error('Informe se a entrega é inicial, substituição ou para uso coletivo.');
   if (p.operation === 'EMPRÉSTIMO' && !p.dueDate) throw new Error('Informe a data prevista para devolução.');
   if (!Array.isArray(p.items) || !p.items.length) throw new Error('Adicione pelo menos um item.');
-  const sectorHasRoles = getMatrix_().rows.some(r => r[0] === p.sector);
-  if (p.recipientType === 'COLABORADOR' && sectorHasRoles && !p.role) throw new Error('Selecione a função para validar os EPIs permitidos.');
-  const allowed = p.recipientType === 'SETOR' ? APP_CONFIG.collectivePpe : getAllowedPpe(p.sector, p.role || '');
+  const allowed = p.recipientType === 'SETOR' ? APP_CONFIG.collectivePpe : getAllowedPpe(p.sector, '');
   p.items.forEach(line => {
     if (!line.item || !['EPI', 'MATERIAL'].includes(line.kind)) throw new Error('Confira o tipo e a descrição de cada item.');
     if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) < 1) throw new Error('A quantidade precisa ser um número inteiro maior que zero.');
