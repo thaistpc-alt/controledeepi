@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root{font-family:Inter,Roboto,Arial,sans-serif;color:#17243b;background:#f3f6fb;--blue:#2457c5;--line:#dbe3ef;--muted:#64748b}
+    *{box-sizing:border-box}body{margin:0;padding:26px 14px 52px}.shell{max-width:920px;margin:auto}
+    .hero{background:linear-gradient(120deg,#123a83,#2d65d2);color:white;padding:28px 30px;border-radius:18px;box-shadow:0 12px 30px #1a428733}
+    .hero h1{font-size:25px;margin:0 0 8px}.hero p{margin:0;color:#e0eaff;line-height:1.5}
+    .card{background:white;border:1px solid var(--line);border-radius:16px;padding:22px;margin-top:16px;box-shadow:0 4px 18px #1e3a5f0b}
+    h2{font-size:17px;margin:0 0 17px;color:#173c82}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}
+    label{font-size:13px;font-weight:650;color:#34435a}input,select,textarea{font:inherit;font-size:14px;border:1px solid #cdd7e5;border-radius:9px;padding:11px 12px;background:#fff;color:#18263d;min-width:0;width:100%}
+    input:focus,select:focus,textarea:focus{outline:3px solid #dce8ff;border-color:#6d94e8}textarea{min-height:82px;resize:vertical}.hint{font-size:12px;color:var(--muted);line-height:1.45}
+    .hidden{display:none!important}.radio-row{display:flex;gap:10px;flex-wrap:wrap}.choice{border:1px solid var(--line);padding:11px 13px;border-radius:10px;display:flex;align-items:center;gap:8px;cursor:pointer}.choice input{width:auto;margin:0;accent-color:var(--blue)}
+    .item-list{display:grid;gap:11px}.item-card{border:1px solid var(--line);border-radius:12px;padding:15px;background:#fbfcff}.item-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-weight:700;font-size:14px}.item-grid{display:grid;grid-template-columns:1.1fr 2fr .75fr 1fr 1fr;gap:10px}.item-grid .field label{font-size:12px}
+    button{border:0;border-radius:10px;padding:12px 16px;font-weight:700;font-size:14px;cursor:pointer}.primary{background:var(--blue);color:#fff}.secondary{background:#edf3ff;color:#204caa}.danger{background:#fff0f0;color:#ad3434;padding:7px 10px;font-size:12px}.actions{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:15px}.submit-row{display:flex;justify-content:flex-end;margin-top:20px}.status{margin-top:14px;padding:12px 14px;border-radius:10px;display:none;line-height:1.45}.status.ok{display:block;background:#eaf8ef;color:#17643a;border:1px solid #b8e4c7}.status.err{display:block;background:#fff0ef;color:#a12820;border:1px solid #f1c2be}.busy{opacity:.65;pointer-events:none}.footer{font-size:12px;color:#718096;text-align:center;margin-top:17px}
+    @media(max-width:720px){body{padding:14px 10px 32px}.hero{padding:22px}.hero h1{font-size:22px}.card{padding:17px}.grid{grid-template-columns:1fr}.field.full{grid-column:auto}.item-grid{grid-template-columns:1fr 1fr}.item-grid .item-field{grid-column:1/-1}.actions{align-items:stretch;flex-direction:column}.actions button{width:100%}}
+  </style>
+</head>
+<body>
+<main class="shell" id="app">
+  <header class="hero">
+    <h1>Saída e empréstimo de itens</h1>
+    <p>Registre uma entrega ou empréstimo. Inclua todos os itens na mesma movimentação; o formulário cria uma linha por item para facilitar a conferência no almox.</p>
+  </header>
+  <div id="message" class="status" role="status" aria-live="polite"></div>
+  <section class="card">
+    <h2>1. Operação e destinatário</h2>
+    <div class="grid">
+      <div class="field"><label for="operation">Operação *</label><select id="operation"><option value="ENTREGA">Entrega</option><option value="EMPRÉSTIMO">Empréstimo</option><option value="DEVOLUÇÃO">Devolução de empréstimo</option></select></div>
+      <div class="field" id="delivery-type-wrap"><label for="deliveryType">Tipo de entrega *</label><select id="deliveryType"><option value="INICIAL">Inicial</option><option value="SUBSTITUIÇÃO">Substituição</option><option value="USO COLETIVO">Uso coletivo / setor</option></select></div>
+      <div class="field" id="recipient-type-wrap"><label for="recipientType">Destinatário *</label><select id="recipientType"><option value="COLABORADOR">Colaborador</option><option value="SETOR">Setor / uso coletivo</option></select></div>
+      <div class="field" id="link-wrap"><label for="link">Vínculo *</label><select id="link"><option value="PRÓPRIO">Próprio</option><option value="TERCEIRIZADO">Terceirizado</option></select></div>
+      <div class="field" id="matricula-wrap"><label for="matricula">Matrícula</label><input id="matricula" inputmode="numeric" maxlength="4" placeholder="4 dígitos"><span class="hint">Ao localizar a matrícula, o nome, setor e função serão preenchidos.</span></div>
+      <div class="field hidden" id="company-wrap"><label for="company">Empresa terceirizada *</label><input id="company" placeholder="Nome da empresa"></div>
+      <div class="field hidden" id="name-wrap"><label for="name">Nome do colaborador *</label><input id="name" placeholder="Nome completo"><span class="hint" id="name-hint">Para vínculo próprio, o nome será buscado pela matrícula.</span></div>
+      <div class="field" id="sector-wrap"><label for="sector">Setor de destino *</label><select id="sector"><option value="">Carregando setores…</option></select></div>
+      <div class="field hidden" id="other-sector-wrap"><label for="otherSector">Informe o setor assistencial *</label><input id="otherSector" placeholder="Nome do setor"></div>
+      <div class="field" id="role-wrap"><label for="role">Função</label><select id="role"><option value="">Selecione o setor primeiro</option></select><span class="hint">A lista de EPIs será filtrada pela matriz de setor e função.</span></div>
+      <div class="field hidden" id="due-wrap"><label for="dueDate">Devolução prevista *</label><input id="dueDate" type="date"></div>
+      <div class="field hidden" id="return-wrap"><label for="loanId">Empréstimo a devolver *</label><select id="loanId"><option value="">Carregando empréstimos…</option></select></div>
+      <div class="field"><label for="responsible">Responsável pela entrega/registro *</label><input id="responsible" placeholder="Nome do responsável"></div>
+    </div>
+  </section>
+  <section class="card" id="items-section">
+    <h2>2. Itens da movimentação</h2>
+    <div class="hint" style="margin:-8px 0 14px">Escolha EPI permitido para o setor/função ou outro material do catálogo do almox. Tamanho e CA são registrados por item.</div>
+    <div id="items" class="item-list"></div>
+    <div class="actions"><button type="button" id="add-item" class="secondary">＋ Adicionar item</button><span class="hint">O código do almox é cruzado automaticamente quando a descrição identifica um único produto.</span></div>
+  </section>
+  <section class="card" id="notes-section">
+    <h2>3. Complemento</h2>
+    <div class="field"><label for="notes">Observação</label><textarea id="notes" placeholder="Motivo da substituição, condição do empréstimo ou informação complementar"></textarea></div>
+  </section>
+  <div class="submit-row"><button type="button" id="submit" class="primary">Registrar movimentação</button></div>
+  <div class="footer">Confira setor, item, quantidade e tamanho antes de registrar.</div>
+</main>
+<script>
+  let bootstrap = {sectors:[], functionsBySector:{}, catalog:[], sizes:[], collectivePpe:[]};
+  let itemCounter = 0;
+  const $ = id => document.getElementById(id);
+  const setOptions = (el, rows, placeholder) => {
+    el.innerHTML = '';
+    const empty = document.createElement('option'); empty.value=''; empty.textContent=placeholder; el.appendChild(empty);
+    rows.forEach(row => { const o=document.createElement('option'); o.value=row.value ?? row; o.textContent=row.label ?? row; el.appendChild(o); });
+  };
+  function showMessage(text, ok) { const box=$('message'); box.textContent=text; box.className='status '+(ok?'ok':'err'); box.scrollIntoView({behavior:'smooth',block:'center'}); }
+  function clearMessage(){ $('message').className='status'; $('message').textContent=''; }
+  function init(){
+    $('operation').addEventListener('change', syncOperation);
+    $('recipientType').addEventListener('change', syncRecipient);
+    $('link').addEventListener('change', syncLink);
+    $('sector').addEventListener('change', () => { syncOtherSector(); loadRoles(); refreshItemOptions(); });
+    $('role').addEventListener('change', refreshItemOptions);
+    $('matricula').addEventListener('change', findEmployee);
+    $('add-item').addEventListener('click', () => addItem());
+    $('submit').addEventListener('click', submit);
+    google.script.run.withSuccessHandler(data=>{
+      bootstrap=data;
+      const sectorOptions=data.sectors.map(s=>s);
+      sectorOptions.push({value:'__OUTRO__',label:'Outro setor assistencial…'});
+      setOptions($('sector'),sectorOptions,'Selecione o setor');
+      setOptions($('role'),[],'Selecione o setor primeiro');
+      loadOpenLoans(); addItem(); syncRecipient(); syncOperation();
+    }).withFailureHandler(err=>showMessage(err.message||String(err),false)).getBootstrapData();
+  }
+  function syncOperation(){
+    const op=$('operation').value, returning=op==='DEVOLUÇÃO', loan=op==='EMPRÉSTIMO';
+    $('delivery-type-wrap').classList.toggle('hidden',op!=='ENTREGA');
+    $('due-wrap').classList.toggle('hidden',!loan); $('return-wrap').classList.toggle('hidden',!returning);
+    $('items-section').classList.toggle('hidden',returning); $('notes-section').classList.toggle('hidden',false);
+    $('recipient-type-wrap').classList.toggle('hidden',returning); $('link-wrap').classList.toggle('hidden',returning);
+    $('matricula-wrap').classList.toggle('hidden',returning); $('company-wrap').classList.toggle('hidden',returning); $('name-wrap').classList.toggle('hidden',returning);
+    $('sector-wrap').classList.toggle('hidden',returning); $('other-sector-wrap').classList.toggle('hidden',returning); $('role-wrap').classList.toggle('hidden',returning);
+    if(!returning){ syncRecipient(); refreshItemOptions(); }
+    $('submit').textContent=returning?'Registrar devolução':'Registrar movimentação';
+  }
+  function syncRecipient(){
+    const sectorRecipient=$('recipientType').value==='SETOR';
+    $('link-wrap').classList.toggle('hidden',sectorRecipient);
+    $('matricula-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='PRÓPRIO');
+    $('company-wrap').classList.toggle('hidden',sectorRecipient || $('link').value!=='TERCEIRIZADO');
+    $('name-wrap').classList.toggle('hidden',sectorRecipient);
+    $('role-wrap').classList.toggle('hidden',sectorRecipient);
+    if(sectorRecipient) $('role').value='';
+    if(sectorRecipient){ $('deliveryType').value='USO COLETIVO'; $('delivery-type-wrap').classList.toggle('hidden',$('operation').value!=='ENTREGA'); }
+    else if($('deliveryType').value==='USO COLETIVO') $('deliveryType').value='INICIAL';
+    refreshItemOptions();
+  }
+  function syncLink(){
+    $('name').value=''; $('name').readOnly=false;
+    $('name-hint').textContent=$('link').value==='PRÓPRIO'?'Para vínculo próprio, o nome será buscado pela matrícula.':'Informe o nome completo do colaborador terceirizado.';
+    if($('link').value==='PRÓPRIO') $('company').value='';
+    syncRecipient();
+  }
+  function syncOtherSector(){ const other=$('sector').value==='__OUTRO__'; $('other-sector-wrap').classList.toggle('hidden',!other); }
+  function loadRoles(){
+    const s=$('sector').value;
+    if(!s || s==='__OUTRO__'){ setOptions($('role'),[],'Sem função cadastrada'); return; }
+    setOptions($('role'),bootstrap.functionsBySector[s]||[],'Selecione a função (opcional para setor)');
+  }
+  function findEmployee(){
+    const matricula=$('matricula').value.trim(); if(matricula.length!==4) return;
+    google.script.run.withSuccessHandler(person=>{
+      if(!person){ $('name').readOnly=false; $('name-hint').textContent='Matrícula não localizada na matriz. Informe o nome completo para registrar.'; showMessage('Matrícula não localizada na matriz. Confira o número e informe o nome completo.',false); return; }
+      clearMessage();
+      const s=$('sector');
+      if(Array.from(s.options).some(o=>o.value===person.sector)) s.value=person.sector;
+      syncOtherSector(); loadRoles(); $('role').value=person.role;
+      $('name').value=person.name; $('name').readOnly=true; $('name-hint').textContent='Nome localizado pela matrícula.';
+      refreshItemOptions();
+    }).withFailureHandler(err=>showMessage(err.message||String(err),false)).lookupEmployee(matricula);
+  }
+  function getSector(){ return $('sector').value==='__OUTRO__' ? $('otherSector').value.trim() : $('sector').value; }
+  function addItem(){
+    const id=++itemCounter, card=document.createElement('div'); card.className='item-card'; card.dataset.id=id;
+    card.innerHTML=`<div class="item-head"><span>Item ${id}</span><button type="button" class="danger" aria-label="Remover item">Remover</button></div>
+      <div class="item-grid">
+        <div class="field"><label>Tipo *</label><select class="kind"><option value="EPI">EPI</option><option value="MATERIAL">Outro material</option></select></div>
+        <div class="field item-field"><label>Descrição *</label><select class="item"><option value="">Selecione</option></select></div>
+        <div class="field"><label>Tamanho *</label><select class="size"></select></div>
+        <div class="field"><label>CA</label><input class="ca" placeholder="Número do CA"></div>
+        <div class="field"><label>Quantidade *</label><input class="quantity" type="number" min="1" step="1" value="1"></div>
+      </div>`;
+    card.querySelector('.danger').addEventListener('click',()=>{card.remove();renumberItems();});
+    card.querySelector('.kind').addEventListener('change',()=>refreshOneItem(card));
+    $('items').appendChild(card); refreshOneItem(card); renumberItems();
+  }
+  function renumberItems(){ Array.from($('items').children).forEach((el,i)=>el.querySelector('.item-head span').textContent='Item '+(i+1)); }
+  function refreshItemOptions(){ Array.from($('items').children).forEach(refreshOneItem); }
+  function refreshOneItem(card){
+    const kind=card.querySelector('.kind').value, select=card.querySelector('.item'), size=card.querySelector('.size');
+    const old=select.value; let items=[];
+    if(kind==='EPI'){
+      const sector=getSector(), role=$('role').value;
+      if($('recipientType').value==='SETOR'){
+        fillItemSelect(select,bootstrap.collectivePpe,old);
+      } else if(sector){
+        google.script.run.withSuccessHandler(list=>{ fillItemSelect(select,list,old); }).withFailureHandler(err=>showMessage(err.message||String(err),false)).getAllowedPpe(sector,role,'COLABORADOR');
+      } else { fillItemSelect(select,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],old); }
+    } else { items=bootstrap.catalog.map(x=>x.description); fillItemSelect(select,items,old); size.disabled=true; size.value='NA'; }
+    if(kind==='EPI'){
+      setOptions(size,bootstrap.sizes,'Selecione'); size.value='NA'; size.disabled=false;
+    }
+  }
+  function fillItemSelect(select,items,old){
+    setOptions(select,items,'Selecione um item permitido');
+    if(items.includes(old)) select.value=old;
+  }
+  function loadOpenLoans(){
+    google.script.run.withSuccessHandler(loans=>{
+      const options=loans.map(l=>({value:l.id,label:`${l.id} · ${l.item} · qtd. ${l.qty} · ${l.sector}`}));
+      setOptions($('loanId'),options,'Selecione o empréstimo');
+    }).withFailureHandler(err=>showMessage(err.message||String(err),false)).getOpenLoans();
+  }
+  function collectPayload(){
+    const op=$('operation').value, sector=getSector();
+    const p={operation:op,responsible:$('responsible').value.trim(),notes:$('notes').value.trim()};
+    if(op==='DEVOLUÇÃO'){ p.loanId=$('loanId').value; return p; }
+    p.recipientType=$('recipientType').value; p.sector=sector; p.role=$('role').value;
+    p.link=p.recipientType==='SETOR'?'':$('link').value;
+    if(p.link==='PRÓPRIO'){p.matricula=$('matricula').value.trim();p.name=$('name').value.trim();}
+    if(p.link==='TERCEIRIZADO'){p.company=$('company').value.trim();p.name=$('name').value.trim();}
+    p.deliveryType=op==='ENTREGA'?$('deliveryType').value:'';
+    p.dueDate=$('dueDate').value;
+    p.items=Array.from($('items').children).map(card=>({
+      kind:card.querySelector('.kind').value,item:card.querySelector('.item').value,
+      size:card.querySelector('.size').value||'NA',ca:card.querySelector('.ca').value.trim(),
+      quantity:card.querySelector('.quantity').value
+    }));
+    return p;
+  }
+  function submit(){
+    clearMessage(); const button=$('submit'), app=$('app'); button.disabled=true; app.classList.add('busy');
+    google.script.run.withSuccessHandler(result=>{
+      app.classList.remove('busy'); button.disabled=false; showMessage(result.message+' Identificador: '+result.id,true);
+      if($('operation').value==='EMPRÉSTIMO') loadOpenLoans();
+      if($('operation').value==='DEVOLUÇÃO') loadOpenLoans();
+      $('notes').value='';
+    }).withFailureHandler(err=>{app.classList.remove('busy');button.disabled=false;showMessage(err.message||String(err),false);}).submitMovement(collectPayload());
+  }
+  init();
+</script>
+</body>
+</html>
