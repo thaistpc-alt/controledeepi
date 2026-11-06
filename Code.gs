@@ -17,13 +17,14 @@ const APP_CONFIG = {
   occasionalCarePpe: ['ÓCULOS DE SEGURANÇA', 'PROTETOR AUDITIVO EM ESPUMA'],
   formSectors: ['CME', 'MANUTENÇÃO', 'TRANSPORTE INTERNO', 'IMAGEM-ENDOSCOPIA', 'IMAGEM-RESSONANCIA', 'CAF-SANEANTES', 'ROUPARIA', 'SESMT'],
   contractorSectors: ['MANUTENÇÃO', 'HOTELARIA', 'NAC', 'NTI', 'TRANSPORTE', 'IMAGEM', 'CME', 'GERENCIA DE ENFERMAGEM'],
+  contractorActivities: ['TRANSPORTE', 'ESTÁGIO', 'RESIDÊNCIA', 'ASSISTÊNCIA', 'ADMINISTRATIVO'],
   sizes: ['34', '35', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45', '46'],
   otherMaterials: ['CONE', 'FITA ANTIDERRAPANTE', 'LUMINÁRIA', 'PLACA DE SINALIZAÇÃO', 'APOIO PARA OS PÉS', 'EXTINTOR', 'MANGUEIRA'],
   movementHeaders: [
-    'ID MOVIMENTAÇÃO', 'DATA/HORA', 'OPERAÇÃO', 'DESTINATÁRIO', 'VÍNCULO', 'EMPRESA',
-    'MATRÍCULA', 'NOME', 'SETOR', 'TIPO DE ENTREGA', 'TIPO DE ITEM',
-    'ITEM', 'TAMANHO', 'CA', 'QUANTIDADE', 'DEVOLUÇÃO PREVISTA', 'ID DO EMPRÉSTIMO',
-    'RESPONSÁVEL', 'OBSERVAÇÃO'
+    'DATA/HORA', 'DESTINATÁRIO', 'VÍNCULO', 'EMPRESA', 'MATRÍCULA', 'SETOR',
+    'ITEM', 'CA', 'QUANTIDADE', 'NOME', 'TIPO DE ENTREGA', 'ID MOVIMENTAÇÃO',
+    'OPERAÇÃO', 'TIPO DE ITEM', 'TAMANHO', 'DEVOLUÇÃO PREVISTA', 'ID DO EMPRÉSTIMO',
+    'RESPONSÁVEL', 'OBSERVAÇÃO', 'ATUAÇÃO'
   ]
 };
 
@@ -37,6 +38,7 @@ function getBootstrapData() {
   return {
     sectors: APP_CONFIG.formSectors,
     contractorSectors: APP_CONFIG.contractorSectors,
+    contractorActivities: APP_CONFIG.contractorActivities,
     catalog: getAlmoxCatalog_().map(x => ({code: x.code, description: x.description})),
     sizes: APP_CONFIG.sizes,
     otherMaterials: APP_CONFIG.otherMaterials.map(item => ({value:item,label:item === 'LUMINÁRIA' ? 'LUMINÁRIA DE EMERGÊNCIA' : item})).concat([{value:'OUTRO',label:'OUTRO'}]),
@@ -107,16 +109,58 @@ function destinationClauseApplies_(clause, sector, wanted) {
   return candidates.some(value => target.includes(value) || value.includes(target.trim()));
 }
 
+function movementHeaderIndexes_(sheet) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  return headers.reduce((map, header, index) => {
+    const key = normalize_(header);
+    if (key) map[key] = index;
+    return map;
+  }, {});
+}
+
+function movementRowFor_(sheet, record) {
+  const fields = {};
+  fields[normalize_('DATA/HORA')] = record.timestamp;
+  fields[normalize_('DESTINATÁRIO')] = record.recipient;
+  fields[normalize_('VÍNCULO')] = record.link;
+  fields[normalize_('EMPRESA')] = record.company;
+  fields[normalize_('MATRÍCULA')] = record.matricula;
+  fields[normalize_('SETOR')] = record.sector;
+  fields[normalize_('ITEM')] = record.item;
+  fields[normalize_('CA')] = record.ca;
+  fields[normalize_('QUANTIDADE')] = record.quantity;
+  fields[normalize_('NOME')] = record.name;
+  fields[normalize_('TIPO DE ENTREGA')] = record.deliveryType;
+  fields[normalize_('ID MOVIMENTAÇÃO')] = record.id;
+  fields[normalize_('OPERAÇÃO')] = record.operation;
+  fields[normalize_('TIPO DE ITEM')] = record.kind;
+  fields[normalize_('TAMANHO')] = record.size;
+  fields[normalize_('DEVOLUÇÃO PREVISTA')] = record.dueDate;
+  fields[normalize_('ID DO EMPRÉSTIMO')] = record.loanId;
+  fields[normalize_('RESPONSÁVEL')] = record.responsible;
+  fields[normalize_('OBSERVAÇÃO')] = record.notes;
+  fields[normalize_('ATUAÇÃO')] = record.activity;
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
+  return headers.map(header => fields[normalize_(header)] ?? '');
+}
+
 function getOpenLoans() {
   const sheet = getMovementsSheet_(false);
   if (!sheet || sheet.getLastRow() < 2) return [];
-  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, APP_CONFIG.movementHeaders.length).getDisplayValues();
+  const headerIndexes = movementHeaderIndexes_(sheet);
+  const rows = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getDisplayValues();
   const open = new Map();
+  const value = (row, header) => row[headerIndexes[normalize_(header)]];
   rows.forEach(r => {
-    const op = r[2];
-    const loanId = r[16];
+    const op = value(r, 'OPERAÇÃO');
+    const loanId = value(r, 'ID DO EMPRÉSTIMO');
     if (op === 'EMPRÉSTIMO' && loanId) {
-      open.set(loanId, {id: loanId, item: r[11], kind: r[10], size: r[12], ca: r[13], qty: r[14], recipient: r[3], sector: r[8], due: r[15]});
+      open.set(loanId, {
+        id: loanId, item: value(r, 'ITEM'), kind: value(r, 'TIPO DE ITEM'),
+        size: value(r, 'TAMANHO'), ca: value(r, 'CA'), qty: value(r, 'QUANTIDADE'),
+        recipient: value(r, 'DESTINATÁRIO'), sector: value(r, 'SETOR'),
+        due: value(r, 'DEVOLUÇÃO PREVISTA')
+      });
     } else if (op === 'DEVOLUÇÃO' && loanId) {
       open.delete(loanId);
     }
@@ -137,24 +181,24 @@ function submitMovement(payload) {
     const sector = payload.sector;
     const name = payload.name || '';
     const company = payload.link === 'TERCEIRIZADO' ? (payload.company || '') : '';
+    const activity = payload.link === 'TERCEIRIZADO' ? (payload.activity || '') : '';
     const recipient = person ? 'COLABORADOR' : 'SETOR';
     const movementSheet = getMovementsSheet_(true);
     const queue = ensureAlmoxQueueSheet_(getSpreadsheet_());
     const catalog = getAlmoxCatalog_();
-    const records = [];
-
-    payload.items.forEach((line, index) => {
+    const records = payload.items.map((line, index) => {
       const loanId = payload.operation === 'EMPRÉSTIMO' ? id + '-' + (index + 1) : '';
-      records.push([
-        id, timestamp, payload.operation, recipient, payload.link || '', company,
-        person ? (payload.link === 'PRÓPRIO' ? payload.matricula : '') : '',
-        person ? name : '', sector, payload.deliveryType || '', line.kind, line.item,
-        line.size || 'NA', line.ca || '', Number(line.quantity),
-        payload.dueDate || '', loanId, payload.responsible, payload.notes || ''
-      ]);
+      return movementRowFor_(movementSheet, {
+        id, timestamp, operation: payload.operation, recipient, link: payload.link || '',
+        company, activity, matricula: person && payload.link === 'PRÓPRIO' ? payload.matricula : '',
+        name: person ? name : '', sector, deliveryType: payload.deliveryType || '',
+        kind: line.kind, item: line.item, size: line.size || 'NA', ca: line.ca || '',
+        quantity: Number(line.quantity), dueDate: payload.dueDate || '', loanId,
+        responsible: payload.responsible, notes: payload.notes || ''
+      });
     });
 
-    movementSheet.getRange(movementSheet.getLastRow() + 1, 1, records.length, APP_CONFIG.movementHeaders.length).setValues(records);
+    movementSheet.getRange(movementSheet.getLastRow() + 1, 1, records.length, movementSheet.getLastColumn()).setValues(records);
     // A saída do sistema Almox recebe uma linha por item. O código é cruzado pelo catálogo;
     // quando a descrição não permite uma associação inequívoca, a linha fica marcada para conferência.
     if (queue) {
@@ -181,12 +225,15 @@ function registerReturn_(payload) {
   if (!loan) throw new Error('Empréstimo não encontrado ou já devolvido. Atualize a lista e tente novamente.');
   const sheet = getMovementsSheet_(true);
   const id = Utilities.getUuid().split('-')[0].toUpperCase();
-  const row = [
-    id, new Date(), 'DEVOLUÇÃO', loan.recipient === 'SETOR' ? 'SETOR' : 'COLABORADOR', '', '', '', '',
-    loan.sector, '', loan.kind || 'EPI', loan.item, loan.size || 'NA', loan.ca || '', Number(loan.qty),
-    '', loan.id, payload.responsible, payload.notes || ''
-  ];
-  sheet.appendRow(row);
+  const row = movementRowFor_(sheet, {
+    id, timestamp: new Date(), operation: 'DEVOLUÇÃO',
+    recipient: loan.recipient === 'SETOR' ? 'SETOR' : 'COLABORADOR',
+    link: '', company: '', activity: '', matricula: '', name: '', sector: loan.sector,
+    deliveryType: '', kind: loan.kind || 'EPI', item: loan.item, size: loan.size || 'NA',
+    ca: loan.ca || '', quantity: Number(loan.qty), dueDate: '', loanId: loan.id,
+    responsible: payload.responsible, notes: payload.notes || ''
+  });
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, sheet.getLastColumn()).setValues([row]);
   return {ok: true, id, message: 'Devolução registrada.'};
 }
 
@@ -202,7 +249,8 @@ function validatePayload_(p) {
   if (p.recipientType === 'COLABORADOR') {
     if (!['PRÓPRIO', 'TERCEIRIZADO'].includes(p.link)) throw new Error('Selecione o vínculo do colaborador.');
     if (p.link === 'PRÓPRIO' && !p.matricula) throw new Error('Informe a matrícula do colaborador próprio.');
-    if (p.link === 'TERCEIRIZADO' && (!p.company || !p.name)) throw new Error('Informe a empresa e o nome do colaborador terceirizado.');
+    if (p.link === 'TERCEIRIZADO' && (!p.company || !p.activity || !p.name)) throw new Error('Informe a atuação, a empresa e o nome do colaborador terceirizado.');
+    if (p.link === 'TERCEIRIZADO' && !APP_CONFIG.contractorActivities.includes(p.activity)) throw new Error('Selecione uma atuação válida para o colaborador terceirizado.');
   }
   if (p.operation === 'ENTREGA' && !['INICIAL', 'SUBSTITUIÇÃO'].includes(p.deliveryType)) throw new Error('Selecione se a entrega é inicial ou substituição.');
   if (p.operation === 'EMPRÉSTIMO' && !p.dueDate) throw new Error('Informe a data prevista para devolução.');
