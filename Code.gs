@@ -78,10 +78,15 @@ function getAllowedPpe(sector, role, recipientType) {
   const destination = String(sector || '').trim();
   return unique_(rows.filter(r => {
     if (!r[0] || !r[1] || !r[2]) return false;
-    const exits = normalize_(r[1]).replace(/INDIDIVIDUAL/g, 'INDIVIDUAL');
+    const exits = normalizeExitType_(r[1]);
     if (!exits.includes(wanted)) return false;
     return String(r[2]).split(',').some(clause => destinationClauseApplies_(clause, destination, wanted));
   }).map(r => r[0]));
+}
+
+function normalizeExitType_(value) {
+  // A coluna SAÍDA contém variações de digitação de INDIVIDUAL (ex.: INDIDIVUAL).
+  return normalize_(value).replace(/INDIDIVUAL|INDIDIVIDUAL/g, 'INDIVIDUAL');
 }
 
 function destinationClauseApplies_(clause, sector, wanted) {
