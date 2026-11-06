@@ -33,7 +33,7 @@
       <div class="field" id="delivery-type-wrap"><label for="deliveryType">Tipo de entrega *</label><select id="deliveryType"><option value="INICIAL">Inicial</option><option value="SUBSTITUIÇÃO">Substituição</option></select></div>
       <div class="field" id="recipient-type-wrap"><label for="recipientType">Destinatário *</label><select id="recipientType"><option value="COLABORADOR">Colaborador</option><option value="SETOR">Setor / uso coletivo</option></select></div>
       <div class="field" id="link-wrap"><label for="link">Vínculo *</label><select id="link"><option value="PRÓPRIO">Próprio</option><option value="TERCEIRIZADO">Terceirizado</option></select></div>
-      <div class="field" id="matricula-wrap"><label for="matricula">Matrícula *</label><input id="matricula" inputmode="numeric" maxlength="4" placeholder="4 dígitos"><span class="hint">Ao localizar a matrícula, o nome, setor e função serão preenchidos.</span></div>
+      <div class="field" id="matricula-wrap"><label for="matricula">Matrícula *</label><input id="matricula" inputmode="numeric" maxlength="4" placeholder="Digite a matrícula"></div>
       <div class="field hidden" id="company-wrap"><label for="company">Empresa terceirizada *</label><select id="company"><option value="">Selecione</option><option>COOPERATIVA</option><option>SERVIÇOS GERAIS</option><option>SEGURANÇA</option><option>OBRAS</option><option>TRATAMENTO DE ESGOTO E ÁGUA</option><option>AR-CONDICIONADO</option><option>DEDETIZAÇÃO</option><option>ALIMENTAÇÃO</option><option>SUBESTAÇÃO</option><option>IMAGEM</option><option>HEMODIÁLISE</option><option value="OUTRA">OUTRA</option></select></div>
       <div class="field hidden" id="other-company-wrap"><label for="otherCompany">Informe a empresa terceirizada *</label><input id="otherCompany" placeholder="Nome da empresa"></div>
       <div class="field hidden" id="name-wrap"><label for="name">Nome do colaborador *</label><input id="name" placeholder="Nome completo"><span class="hint" id="name-hint">Para vínculo próprio, o nome será buscado pela matrícula.</span></div>
@@ -79,7 +79,6 @@
     $('sector').addEventListener('change', () => { syncOtherSector(); refreshItemOptions(); });
     $('company').addEventListener('change', syncCompany);
     $('responsible').addEventListener('change', syncResponsible);
-    $('matricula').addEventListener('change', findEmployee);
     $('add-item').addEventListener('click', () => addItem());
     $('submit').addEventListener('click', submit);
     google.script.run.withSuccessHandler(data=>{
@@ -111,7 +110,6 @@
   }
   function syncLink(){
     $('name').value=''; $('name').readOnly=false;
-    $('name-hint').textContent='Informe o nome completo do colaborador terceirizado.';
     if($('link').value==='PRÓPRIO') $('company').value='';
     syncRecipient(); syncCompany();
   }
@@ -137,19 +135,6 @@
   }
   function syncCompany(){ const show=$('recipientType').value==='COLABORADOR' && $('link').value==='TERCEIRIZADO'; $('other-company-wrap').classList.toggle('hidden',!show || $('company').value!=='OUTRA'); }
   function syncResponsible(){ $('other-responsible-wrap').classList.toggle('hidden',$('responsible').value!=='OUTRO'); }
-  function findEmployee(){
-    const matricula=$('matricula').value.trim(); if(matricula.length!==4) return;
-    google.script.run.withSuccessHandler(person=>{
-      if(!person){ $('name').readOnly=false; $('name-hint').textContent='Matrícula não localizada na matriz. Informe o nome completo para registrar.'; showMessage('Matrícula não localizada na matriz. Confira o número e informe o nome completo.',false); return; }
-      clearMessage();
-      const s=$('sector');
-      if(Array.from(s.options).some(o=>o.value===person.sector)) s.value=person.sector;
-      else { s.value='__OUTRO__'; $('otherSector').value=person.sector; }
-      syncOtherSector();
-      $('name').value=person.name; $('name').readOnly=true; $('name-hint').textContent='Nome localizado pela matrícula.';
-      refreshItemOptions();
-    }).withFailureHandler(err=>showMessage(err.message||String(err),false)).lookupEmployee(matricula);
-  }
   function getSector(){ return $('sector').value==='__OUTRO__' ? $('otherSector').value.trim() : $('sector').value; }
   function addItem(){
     const id=++itemCounter, card=document.createElement('div'); card.className='item-card'; card.dataset.id=id;
@@ -229,7 +214,7 @@
     if(op==='DEVOLUÇÃO'){ p.loanId=$('loanId').value; return p; }
     p.recipientType=$('recipientType').value; p.sector=sector;
     p.link=p.recipientType==='SETOR'?'':$('link').value;
-    if(p.link==='PRÓPRIO'){p.matricula=$('matricula').value.trim();p.name=$('name').value.trim();}
+    if(p.link==='PRÓPRIO'){p.matricula=$('matricula').value.trim();}
     if(p.link==='TERCEIRIZADO'){p.company=$('company').value==='OUTRA' ? $('otherCompany').value.trim() : $('company').value;p.name=$('name').value.trim();}
     p.deliveryType=op==='ENTREGA'?$('deliveryType').value:'';
     p.dueDate=$('dueDate').value;
