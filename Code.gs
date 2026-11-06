@@ -3,7 +3,7 @@ const APP_CONFIG = {
   tabs: {
     matrix: 'MATRIZ POR SETOR',
     almoxCatalog: 'CÓD. ALMOX',
-    almoxQueue: 'LANÇAR ALMOX',
+    almoxQueue: 'CONTROLE ALMOX',
     codeMap: 'MAPEAMENTO ALMOX',
     movements: 'MOVIMENTAÇÕES EPI',
     destinationMaterials: 'DESTINO DE MATERIAIS'
@@ -47,6 +47,8 @@ function getBootstrapData() {
 function setupEpiModule() {
   const ss = getSpreadsheet_();
   getMovementsSheet_(true);
+  ensureAlmoxQueueSheet_(ss);
+  ensureAlmoxEditTriggers_(ss);
   ensureDestinationMaterialsSheet_(ss);
   let map = ss.getSheetByName(APP_CONFIG.tabs.codeMap);
   if (!map) {
@@ -138,7 +140,7 @@ function submitMovement(payload) {
     const company = payload.link === 'TERCEIRIZADO' ? (payload.company || '') : '';
     const recipient = person ? 'COLABORADOR' : 'SETOR';
     const movementSheet = getMovementsSheet_(true);
-    const queue = getSheet_(APP_CONFIG.tabs.almoxQueue);
+    const queue = ensureAlmoxQueueSheet_(getSpreadsheet_());
     const catalog = getAlmoxCatalog_();
     const records = [];
 
@@ -159,10 +161,12 @@ function submitMovement(payload) {
     if (queue) {
       const almoxRows = payload.items.map(line => {
         const code = resolveAlmoxCode_(line, catalog);
-        return [timestamp.getFullYear(), timestamp.getMonth() + 1, timestamp, sector, line.item,
-          line.size || 'NA', String(line.quantity), code, ''];
+        return [timestamp, sector, line.kind, line.item, line.size || 'NA',
+          Number(line.quantity), code, false];
       });
-      queue.getRange(queue.getLastRow() + 1, 1, almoxRows.length, 9).setValues(almoxRows);
+      const firstQueueRow = queue.getLastRow() + 1;
+      queue.getRange(firstQueueRow, 1, almoxRows.length, 8).setValues(almoxRows);
+      queue.getRange(firstQueueRow, 8, almoxRows.length, 1).insertCheckboxes();
     }
     return {ok: true, id, message: payload.operation === 'EMPRÉSTIMO'
       ? 'Empréstimo registrado. Guarde o identificador para registrar a devolução.'
@@ -270,6 +274,49 @@ function getAlmoxCatalog_() {
   return sheet.getRange(3, 1, last - 2, 2).getDisplayValues()
     .filter(r => r[0] && r[1])
     .map(r => ({code: String(r[0]).trim(), description: String(r[1]).trim()}));
+}
+
+function ensureAlmoxQueueSheet_(ss) {
+  let sheet = ss.getSheetByName(APP_CONFIG.tabs.almoxQueue);
+  if (!sheet) sheet = ss.insertSheet(APP_CONFIG.tabs.almoxQueue);
+  const headers = ['DATA/HORA', 'SETOR', 'TIPO', 'ITEM', 'TAMANHO', 'QUANTIDADE', 'CÓDIGO ALMOX', 'LANÇADO NO ALMOX?'];
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#d9ead3');
+    sheet.setColumnWidths(1, headers.length, 150);
+    sheet.setColumnWidth(4, 320);
+  }
+  return sheet;
+}
+
+function ensureAlmoxEditTriggers_(ss) {
+  const triggers = ScriptApp.getProjectTriggers();
+  if (!triggers.some(t => t.getHandlerFunction() === 'handleAlmoxEdit_')) {
+    ScriptApp.newTrigger('handleAlmoxEdit_').forSpreadsheet(ss).onEdit().create();
+  }
+  if (!triggers.some(t => t.getHandlerFunction() === 'addAlmoxMenu_')) {
+    ScriptApp.newTrigger('addAlmoxMenu_').forSpreadsheet(ss).onOpen().create();
+  }
+}
+
+function addAlmoxMenu_() {
+  SpreadsheetApp.getUi().createMenu('Controle Almox')
+    .addItem('Exibir todos os registros (inclui lançados)', 'showAllAlmoxRows_')
+    .addToUi();
+}
+
+function showAllAlmoxRows_() {
+  const sheet = getSheet_(APP_CONFIG.tabs.almoxQueue);
+  if (sheet && sheet.getMaxRows() > 1) sheet.showRows(2, sheet.getMaxRows() - 1);
+}
+
+function handleAlmoxEdit_(e) {
+  if (!e || !e.range) return;
+  const sheet = e.range.getSheet();
+  if (sheet.getName() !== APP_CONFIG.tabs.almoxQueue || e.range.getColumn() !== 8 || e.range.getRow() < 2) return;
+  if (String(e.value).toUpperCase() === 'TRUE') sheet.hideRows(e.range.getRow());
+  else sheet.showRows(e.range.getRow());
 }
 
 function ensureDestinationMaterialsSheet_(ss) {
