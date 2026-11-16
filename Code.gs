@@ -65,7 +65,7 @@ function setupEpiModule() {
   return {ok:true, message:'Abas de movimentações e mapeamento do almox prontas. Complete as colunas TIPO, ITEM PADRONIZADO e TAMANHO para cruzar os códigos.'};
 }
 
-function getAllowedPpe(sector, role, recipientType) {
+function getAllowedPpe(sector, role, recipientType, includeAllDestinations) {
   const sheet = getSheet_(APP_CONFIG.tabs.destinationMaterials);
   if (!sheet) throw new Error('A aba DESTINO DE MATERIAIS não foi encontrada.');
   const last = sheet.getLastRow();
@@ -77,7 +77,7 @@ function getAllowedPpe(sector, role, recipientType) {
     if (!r[0] || !r[1] || !r[2] || isOtherMaterial_(r[0])) return false;
     const exits = normalizeExitType_(r[1]);
     if (!exits.includes(wanted)) return false;
-    return String(r[2]).split(',').some(clause => destinationClauseApplies_(clause, destination, wanted));
+    return includeAllDestinations === true || String(r[2]).split(',').some(clause => destinationClauseApplies_(clause, destination, wanted));
   }).map(r => r[0]));
 }
 
@@ -255,7 +255,7 @@ function validatePayload_(p) {
   if (p.operation === 'ENTREGA' && !['INICIAL', 'SUBSTITUIÇÃO'].includes(p.deliveryType)) throw new Error('Selecione se a entrega é inicial ou substituição.');
   if (p.operation === 'EMPRÉSTIMO' && !p.dueDate) throw new Error('Informe a data prevista para devolução.');
   if (!Array.isArray(p.items) || !p.items.length) throw new Error('Adicione pelo menos um item.');
-  const allowed = getAllowedPpe(p.sector, '', p.recipientType);
+  const allowed = getAllowedPpe(p.sector, '', p.recipientType, p.sectorIsOther === true);
   p.items.forEach(line => {
     if (!line || !line.item || !['EPI', 'MATERIAL'].includes(line.kind)) throw new Error('Preencha o tipo e a descrição de cada item.');
     if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) < 1) throw new Error('A quantidade precisa ser um número inteiro maior que zero.');
