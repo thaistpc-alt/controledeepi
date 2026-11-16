@@ -170,7 +170,7 @@
         const recipient=$('recipientType').value;
         google.script.run.withSuccessHandler(list=>{ fillItemSelect(select,list,previous); updateSizeField(card); updateItemPreview(card); })
           .withFailureHandler(err=>showMessage(err.message||String(err),false))
-          .getAllowedPpe(sector,'',recipient);
+          .getAllowedPpe(sector,'',recipient,$('sector').value==='__OUTRO__');
       } else {
         fillItemSelect(select,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],previous); updateItemPreview(card);
       }
@@ -223,7 +223,7 @@
     const op=$('operation').value, sector=getSector();
     const p={operation:op,responsible:$('responsible').value==='OUTRO' ? $('otherResponsible').value.trim() : $('responsible').value,notes:$('notes').value.trim()};
     if(op==='DEVOLUÇÃO'){ p.loanId=$('loanId').value; return p; }
-    p.recipientType=$('recipientType').value; p.sector=sector;
+    p.recipientType=$('recipientType').value; p.sector=sector; p.sectorIsOther=$('sector').value==='__OUTRO__';
     p.link=p.recipientType==='SETOR'?'':$('link').value;
     if(p.link==='PRÓPRIO'){p.matricula=$('matricula').value.trim();}
     if(p.link==='TERCEIRIZADO'){p.activity=$('activity').value;p.company=$('company').value.trim();p.name=$('name').value.trim();}
