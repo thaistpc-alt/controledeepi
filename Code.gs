@@ -37,6 +37,7 @@ function doGet() {
 function getBootstrapData() {
   return {
     sectors: APP_CONFIG.formSectors,
+    otherSectors: getOtherSectors_(),
     contractorSectors: APP_CONFIG.contractorSectors,
     contractorActivities: APP_CONFIG.contractorActivities,
     catalog: getAlmoxCatalog_().map(x => ({code: x.code, description: x.description})),
@@ -65,19 +66,29 @@ function setupEpiModule() {
   return {ok:true, message:'Abas de movimentações e mapeamento do almox prontas. Complete as colunas TIPO, ITEM PADRONIZADO e TAMANHO para cruzar os códigos.'};
 }
 
-function getAllowedPpe(sector, role, recipientType, includeAllDestinations) {
+function getOtherSectors_() {
+  const sheet = getSheet_(APP_CONFIG.tabs.destinationMaterials);
+  if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 4) return [];
+  return unique_(sheet.getRange(2, 4, sheet.getLastRow() - 1, 1).getDisplayValues()
+    .map(r => String(r[0] || '').trim()).filter(Boolean));
+}
+
+function getAllowedPpe(sector, role, recipientType, isOtherSector) {
   const sheet = getSheet_(APP_CONFIG.tabs.destinationMaterials);
   if (!sheet) throw new Error('A aba DESTINO DE MATERIAIS não foi encontrada.');
   const last = sheet.getLastRow();
   if (last < 2) return [];
-  const rows = sheet.getRange(2, 1, last - 1, 3).getDisplayValues();
-  const wanted = recipientType === 'SETOR' ? 'COLETIVO' : 'INDIVIDUAL';
+  const rows = sheet.getRange(2, 1, last - 1, 4).getDisplayValues();
+  const wanted = recipientType === 'SETOR' ? 'SETOR USO COLETIVO' : 'COLABORADOR';
   const destination = String(sector || '').trim();
   return unique_(rows.filter(r => {
     if (!r[0] || !r[1] || !r[2] || isOtherMaterial_(r[0])) return false;
-    const exits = normalizeExitType_(r[1]);
-    if (!exits.includes(wanted)) return false;
-    return includeAllDestinations === true || String(r[2]).split(',').some(clause => destinationClauseApplies_(clause, destination, wanted));
+    const recipients = String(r[1]).split(/[;,]/).map(x => normalize_(x.trim()));
+    if (!recipients.includes(normalize_(wanted))) return false;
+    const destinations = String(r[2]).split(',').map(normalize_);
+    return isOtherSector === true
+      ? destinations.includes(normalize_('OUTRO'))
+      : destinations.some(clause => destinationClauseApplies_(clause, destination, ''));
   }).map(r => r[0]));
 }
 
@@ -245,7 +256,8 @@ function validatePayload_(p) {
     return;
   }
   if (!['COLABORADOR', 'SETOR'].includes(p.recipientType)) throw new Error('Selecione o destinatário.');
-  if (!p.sector) throw new Error('Selecione ou informe o setor.');
+  if (!p.sector) throw new Error('Selecione o setor.');
+  if (p.sectorIsOther === true && !getOtherSectors_().some(x => normalize_(x) === normalize_(p.sector))) throw new Error('Selecione um setor válido na lista de OUTRO.');
   if (p.recipientType === 'COLABORADOR') {
     if (!['PRÓPRIO', 'TERCEIRIZADO'].includes(p.link)) throw new Error('Selecione o vínculo do colaborador.');
     if (p.link === 'PRÓPRIO' && !p.matricula) throw new Error('Informe a matrícula do colaborador próprio.');
@@ -380,7 +392,7 @@ function ensureDestinationMaterialsSheet_(ss) {
   let sheet = ss.getSheetByName(APP_CONFIG.tabs.destinationMaterials);
   if (!sheet) {
     sheet = ss.insertSheet(APP_CONFIG.tabs.destinationMaterials);
-    const headers = ['DESCRIÇÃO', 'SAÍDA', 'DESTINO'];
+    const headers = ['DESCRIÇÃO', 'DESTINATÁRIO', 'SETOR DE DESTINO', '*OUTRO'];
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.setFrozenRows(1);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#e8efff');
