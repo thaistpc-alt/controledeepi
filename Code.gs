@@ -79,7 +79,7 @@ function getAllowedPpe(sector, role, recipientType, isOtherSector) {
   const last = sheet.getLastRow();
   if (last < 2) return [];
   const rows = sheet.getRange(2, 1, last - 1, 4).getDisplayValues();
-  const wanted = recipientType === 'SETOR' ? 'SETOR USO COLETIVO' : 'COLABORADOR';
+  const wanted = recipientType === 'SETOR' ? 'SETOR/ USO COLETIVO' : 'COLABORADOR';
   const destination = String(sector || '').trim();
   return unique_(rows.filter(r => {
     if (!r[0] || !r[1] || !r[2] || isOtherMaterial_(r[0])) return false;
