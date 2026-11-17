@@ -132,6 +132,7 @@ function movementHeaderIndexes_(sheet) {
 function movementRowFor_(sheet, record) {
   const fields = {};
   fields[normalize_('DATA/HORA')] = record.timestamp;
+  fields[normalize_('DATA')] = record.timestamp;
   fields[normalize_('DESTINATÁRIO')] = record.recipient;
   fields[normalize_('VÍNCULO')] = record.link;
   fields[normalize_('EMPRESA')] = record.company;
