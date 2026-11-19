@@ -42,7 +42,6 @@ function getBootstrapData() {
     contractorActivities: APP_CONFIG.contractorActivities,
     catalog: getAlmoxCatalog_().map(x => ({code: x.code, description: x.description})),
     sizes: APP_CONFIG.sizes,
-    otherMaterials: APP_CONFIG.otherMaterials.map(item => ({value:item,label:item === 'LUMINÁRIA' ? 'LUMINÁRIA DE EMERGÊNCIA' : item})).concat([{value:'OUTRO',label:'OUTRO'}]),
     collectivePpe: APP_CONFIG.collectivePpe
   };
 }
@@ -68,28 +67,33 @@ function setupEpiModule() {
 
 function getOtherSectors_() {
   const sheet = getSheet_(APP_CONFIG.tabs.destinationMaterials);
-  if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 4) return [];
-  return unique_(sheet.getRange(2, 4, sheet.getLastRow() - 1, 1).getDisplayValues()
+  if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 5) return [];
+  return unique_(sheet.getRange(2, 5, sheet.getLastRow() - 1, 1).getDisplayValues()
     .map(r => String(r[0] || '').trim()).filter(Boolean));
 }
 
-function getAllowedPpe(sector, role, recipientType, isOtherSector) {
+function getAllowedItems(itemType, sector, recipientType, isOtherSector) {
   const sheet = getSheet_(APP_CONFIG.tabs.destinationMaterials);
   if (!sheet) throw new Error('A aba DESTINO DE MATERIAIS não foi encontrada.');
   const last = sheet.getLastRow();
   if (last < 2) return [];
-  const rows = sheet.getRange(2, 1, last - 1, 4).getDisplayValues();
-  const wanted = recipientType === 'SETOR' ? 'SETOR/ USO COLETIVO' : 'COLABORADOR';
+  const rows = sheet.getRange(2, 1, last - 1, 5).getDisplayValues();
+  const wantedRecipient = recipientType === 'SETOR' ? 'SETOR/ USO COLETIVO' : 'COLABORADOR';
+  const wantedType = normalize_(itemType);
   const destination = String(sector || '').trim();
   return unique_(rows.filter(r => {
-    if (!r[0] || !r[1] || !r[2] || isOtherMaterial_(r[0])) return false;
-    const recipients = String(r[1]).split(/[;,]/).map(x => normalize_(x.trim()));
-    if (!recipients.includes(normalize_(wanted))) return false;
-    const destinations = String(r[2]).split(',').map(normalize_);
+    if (!r[0] || normalize_(r[1]) !== wantedType) return false;
+    const recipients = String(r[2] || '').split(/[;,]/).map(x => normalize_(x.trim()));
+    if (!recipients.includes(normalize_(wantedRecipient))) return false;
+    const destinations = String(r[3] || '').split(',').map(normalize_);
     return isOtherSector === true
       ? destinations.includes(normalize_('OUTRO'))
       : destinations.some(clause => destinationClauseApplies_(clause, destination, ''));
-  }).map(r => r[0]));
+  }).map(r => String(r[0]).trim()).filter(Boolean));
+}
+
+function getAllowedPpe(sector, role, recipientType, isOtherSector) {
+  return getAllowedItems('EPI', sector, recipientType, isOtherSector);
 }
 
 function normalizeExitType_(value) {
@@ -268,22 +272,20 @@ function validatePayload_(p) {
   if (p.operation === 'ENTREGA' && !['INICIAL', 'SUBSTITUIÇÃO'].includes(p.deliveryType)) throw new Error('Selecione se a entrega é inicial ou substituição.');
   if (p.operation === 'EMPRÉSTIMO' && !p.dueDate) throw new Error('Informe a data prevista para devolução.');
   if (!Array.isArray(p.items) || !p.items.length) throw new Error('Adicione pelo menos um item.');
-  const allowed = getAllowedPpe(p.sector, '', p.recipientType, p.sectorIsOther === true);
+  const allowedEpi = getAllowedItems('EPI', p.sector, p.recipientType, p.sectorIsOther === true);
+  const allowedMaterials = getAllowedItems('OUTROS MATERIAIS', p.sector, p.recipientType, p.sectorIsOther === true);
   p.items.forEach(line => {
     if (!line || !line.item || !['EPI', 'MATERIAL'].includes(line.kind)) throw new Error('Preencha o tipo e a descrição de cada item.');
     if (!Number.isInteger(Number(line.quantity)) || Number(line.quantity) < 1) throw new Error('A quantidade precisa ser um número inteiro maior que zero.');
     if (line.kind === 'EPI') {
-      if (!allowed.includes(line.item)) throw new Error('O EPI selecionado não consta como permitido para esse setor e tipo de saída.');
+      if (!allowedEpi.includes(line.item)) throw new Error('O EPI selecionado não consta como permitido para esse setor e destinatário.');
       if (requiresNumericSize_(line.item)) {
         if (!APP_CONFIG.sizes.includes(String(line.size || ''))) throw new Error('Selecione o número do calçado/bota.');
       } else {
         line.size = 'NA';
       }
     } else {
-      const isCustom = line.customMaterial === true;
-      const canonical = String(line.item).trim();
-      if (isCustom && !canonical) throw new Error('Informe a descrição do outro material.');
-      if (!isCustom && !APP_CONFIG.otherMaterials.includes(canonical)) throw new Error('Selecione um material válido.');
+      if (!allowedMaterials.includes(String(line.item).trim())) throw new Error('Selecione um material permitido para esse setor e destinatário.');
       line.size = 'NA';
       line.ca = '';
     }
