@@ -61,7 +61,7 @@
   <div class="footer">Confira setor, item, quantidade e tamanho antes de registrar.</div>
 </main>
 <script>
-  let bootstrap = {sectors:[], contractorSectors:[], otherSectors:[], catalog:[], sizes:[], otherMaterials:[], collectivePpe:[]};
+  let bootstrap = {sectors:[], contractorSectors:[], otherSectors:[], catalog:[], sizes:[], collectivePpe:[]};
   let itemCounter = 0;
   let sectorModeInitialized = false;
   let currentContractorSectorMode = false;
@@ -166,26 +166,27 @@
     const caField=card.querySelector('.ca-field');
     const previous=select.value;
     custom.classList.add('hidden');
+    custom.required=false;
+    custom.value='';
     caField.classList.toggle('hidden',kind==='MATERIAL');
+    const sector=getSector();
+    const recipient=$('recipientType').value;
+    const itemType=kind==='EPI'?'EPI':'OUTROS MATERIAIS';
+    if(sector){
+      setOptions(select,[],'Carregando itens permitidos…');
+      google.script.run.withSuccessHandler(list=>{
+        fillItemSelect(select,list,previous);
+        updateSizeField(card);
+        updateItemPreview(card);
+      }).withFailureHandler(err=>showMessage(err.message||String(err),false))
+        .getAllowedItems(itemType,sector,recipient,$('sector').value==='__OUTRO__');
+    } else {
+      fillItemSelect(select,[],'Selecione primeiro o setor');
+    }
     if(kind==='EPI'){
-      const sector=getSector();
-      if(sector){
-        const recipient=$('recipientType').value;
-        google.script.run.withSuccessHandler(list=>{ fillItemSelect(select,list,previous); updateSizeField(card); updateItemPreview(card); })
-          .withFailureHandler(err=>showMessage(err.message||String(err),false))
-          .getAllowedPpe(sector,'',recipient,$('sector').value==='__OUTRO__');
-      } else {
-        fillItemSelect(select,bootstrap.occasionalCarePpe||['ÓCULOS DE SEGURANÇA','PROTETOR AUDITIVO EM ESPUMA'],previous); updateItemPreview(card);
-      }
       size.disabled=false;
       setOptions(size,bootstrap.sizes,'Selecione o número');
     } else {
-      setOptions(select,bootstrap.otherMaterials||[],'Selecione um material');
-      if((bootstrap.otherMaterials||[]).some(x=>x.value===previous)) select.value=previous;
-      else if(previous && previous!=='OUTRO') select.value=previous;
-      custom.classList.toggle('hidden',select.value!=='OUTRO');
-      if(select.value==='OUTRO') custom.required=true;
-      else { custom.required=false; custom.value=''; }
       size.value='NA'; size.disabled=true; sizeField.classList.add('hidden');
     }
     updateSizeField(card);
@@ -234,8 +235,8 @@
     p.dueDate=$('dueDate').value;
     p.items=Array.from($('items').children).map(card=>({
       kind:card.querySelector('.kind').value,
-      item:card.querySelector('.kind').value==='MATERIAL' && card.querySelector('.item').value==='OUTRO' ? card.querySelector('.item-custom').value.trim() : card.querySelector('.item').value,
-      customMaterial:card.querySelector('.kind').value==='MATERIAL' && card.querySelector('.item').value==='OUTRO',
+      item:card.querySelector('.item').value,
+      customMaterial:false,
       size:card.querySelector('.size').value||'NA',ca:card.querySelector('.ca').value.trim(),
       quantity:card.querySelector('.quantity').value
     }));
